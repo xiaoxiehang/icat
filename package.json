@@ -1,0 +1,35 @@
+{
+  "name": "icat",
+  "description": "It Concise,Agile,Thin...",
+  "version": "0.1.0",
+  "homepage": "https://github.com/valleykid/icat",
+  "author": {
+    "name": "valleykid",
+    "email": "valleykiddy@gmail.com",
+    "url": "www.jndream.net/vkblog"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/valleykid/icat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/valleykid/icat/issues"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/valleykid/icat/blob/master/LICENSE-MIT"
+    }
+  ],
+  "main": "lib/icat",
+  "engines": {
+    "node": ">= 0.6.0"
+  },
+  "scripts": {
+    "test": "grunt test"
+  },
+  "devDependencies": {
+    "grunt": "~0.3.17"
+  },
+  "keywords": []
+}
