@@ -1,76 +1,92 @@
-/*module('关键函数');
+var iCat = ICAT;
+
+module('ICAT关键属性和方法');
+
 test('mix', function(){
-	equal(1,'1', 'OK');
-	deepEqual(mix({},{aaa:2}), {aaa:2}, 'mix({},{aaa:2}) == {aaa:2}');
-	deepEqual(mix({bbb:"test aaa"}, {aaa:2, bbb:"test bbb"}), {aaa:2, bbb:"test bbb"}, 'mix({bbb:"test aaa"}, {aaa:2, bbb:"test bbb"}) == {aaa:2, bbb:"test bbb"}');
-	deepEqual(mix({bbb:"test aaa"}, {aaa:2, bbb:"test bbb"}, undefined, false), {aaa:2, bbb:"test aaa"}, 'mix({bbb:"test aaa"}, {aaa:2, bbb:"test bbb"}, undefined, false) == {aaa:2, bbb:"test aaa"}');
-});*/
-
-
- 
- /*test('iCat#mix', function() {
-    // Not a bad test to run on collection methods.
-    //strictEqual(iCat.mix({}, {aaa:0}), {"aaa":0}, '执行正确');
-	//ok(iCat.mix({}, {aaa:0}), '执行正确');
-	
-	strictEqual(isEven(3), false, '执行正确');
-	strictEqual(isEven(-1), false, '执行正确');
-	strictEqual(isEven(5), false, '执行正确');
-  });
-  
-  module('B');
-  test('iCat#mix', function() {
-	deepEqual(iCat.mix({},{"aaa":2}), {"aaa":2}, 'Two objects can be the same in value');
-  });*/
-
-//ICAT.mix();
-var Class = {};
-Class.create = function(source){
-	var kclass = function(){//console.log(this.initialize);
-		this.initialize.apply(this,arguments);
-	};
-	for(var i in source){
-		kclass.prototype[i] = source[i];
-	}
-	return kclass;
-};
-
-var Able = Class.create({
-	initialize: function(name){
-		this.name = name;
-	},
-	
-	log: function(){
-		alert(this.name);
-	}
+	deepEqual(iCat.mix({},{aaa:2}), {aaa:2});
+	deepEqual(iCat.mix({bbb:"test aaa"}, {aaa:2, bbb:"test bbb"}), {aaa:2, bbb:"test bbb"});
+	deepEqual(iCat.mix({bbb:"test aaa"}, {aaa:2, bbb:"test bbb"}, undefined, false), {aaa:2, bbb:"test bbb"});
 });
 
-ICAT.widget('Ablex', {
-	Create: function(name, util){
-		this.name = name;
-		this.util = util;
-	},
-	
-	log: function(){
-		alert(this.util);
-	}
+test('isDebug', function(){
+	equal(iCat.isDebug, false);
 });
 
-function Ablexx(name){
-	this.name = name;
-}
+test('browser', function(){
+	iCat.foreach({
+		safari: 'chrome or safari.',
+		opera: 'opera.',
+		msie: 'msie.',
+		mozilla: 'mozilla.'
+	}, function(k, v){
+		if(k=='safari') equal(iCat.browser[k], true, v);
+	});
+});
 
-var able = new Able('able'),
-	ablex = new ICAT.Ablex('ablex'),
-	ablexx = new Ablexx('ablexx');
-//able.log();
-ICAT.log(able);
-console.log(ablex);//.constructor==Ablex
-console.log(ablexx);
+test('is函数', function(){
+	var arrKey = ['Function', 'String', 'Array', 'Object', 'Null'],
+		arrExamp = [iCat.mix, iCat.version, arrKey, iCat, null];
+	
+	iCat.foreach(arrKey, function(i, v){
+		equal(iCat['is'+v](arrExamp[i]), true, v);
+	});
+});
 
-module('关键函数');
-test('log', function(){
-	var obj = {};
-	equal(ICAT.isObject(obj), true);
-	deepEqual(ICAT.mix({},{aaa:2}), {aaa:2}, 'mix({},{aaa:2}) == {aaa:2}');
+test('Class/widget', function(){
+	iCat.Class('Person', {
+		Create: function(name, age){
+			this.name = name;
+			this.age = age;
+		},
+		
+		getName: function(){
+			iCat.log(this.name);
+		}
+	});
+	
+	var Jim = new Person('Jim', 23);
+	equal(iCat.isObject(Jim), true);
+	//deepEqual(Jim, {name:'Jim', age:23});
+	iCat.log(Jim); Jim.getName();
+	
+	iCat.widget('Teacher', {
+		Create: function(name, age, subject){
+			Person.call(this, name, age);
+			//arguments.callee.prototype = Person.prototype;
+			
+			this.subject = subject;
+		}
+	});
+	
+	/*iCat.foreach(Person.prototype, function(k, v){
+		iCat.Teacher.prototype[k] = v;
+	});*/
+	iCat.mix(iCat.Teacher.prototype, Person.prototype);
+	var Tom = new iCat.Teacher('Tom', 28, 'English');
+	Tom.getName();
+});
+
+test('app/namespace', function(){
+	iCat.app('aaa');
+	equal(iCat.isObject(aaa), true);
+	equal(iCat.isFunction(aaa.namespace), true);
+	equal(iCat.isFunction(aaa.foreach), true);
+	
+	aaa.namespace('bbb');
+	equal(iCat.isObject(aaa.bbb), true);
+	
+	iCat.namespace('ccc');
+	equal(iCat.isObject(iCat.ccc), true);
+	
+	iCat.app('Able', function(){
+		return {
+			version: '1.0',
+			
+			testfn: function(){
+				alert(0);
+			}
+		}
+	});
+	equal(iCat.isString(Able.version), true);
+	equal(iCat.isFunction(Able.testfn), true);
 });
