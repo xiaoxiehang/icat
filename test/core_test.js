@@ -19,7 +19,7 @@ test('browser', function(){
 		msie: 'msie.',
 		mozilla: 'mozilla.'
 	}, function(k, v){
-		if(k=='safari') equal(iCat.browser[k], true, v);
+		equal(iCat.browser[k], true, v);
 	});
 });
 
