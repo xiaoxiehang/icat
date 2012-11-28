@@ -1,3 +1,4 @@
+/** core.js for common functions */
 (function(){
 	// Create the root object, 'window' in the browser, or 'global' on the server.
 	var root = this, iCat = {};
