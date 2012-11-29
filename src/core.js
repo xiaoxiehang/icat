@@ -15,7 +15,8 @@
 	
 	var _ua = navigator.userAgent, ObjProto = Object.prototype,
 		toString = ObjProto.toString,
-		nativeIsArray = Array.isArray;
+		nativeIsArray = Array.isArray,
+        __APP_MEMBERS = ['namespace'];// iCat.app() with these members.
 	
 	// Copies all the properties of s to r.
 	// w(hite)l(ist):白名单, ov(erwrite):覆盖
@@ -49,9 +50,6 @@
 		
 		// debug or not
 		isDebug: /debug/i.test(root.location.href),
-		
-		// iCat.app() with these members.
-        __APP_MEMBERS: ['namespace'],
 		
 		// kinds of browsers
 		browser: {
@@ -188,7 +186,7 @@
 				isStr = self.isString(name),
                 O = isStr ? root[name] || {} : name;
 
-            self.mix(O, self, self.__APP_MEMBERS, true);
+            self.mix(O, self, __APP_MEMBERS, true);
 			self.mix(O, self.isFunction(sx) ? sx() : sx);
 			isStr && (root[name] = O);
 
