@@ -32,7 +32,7 @@ test('is函数', function(){
 	});
 });
 
-test('Class/widget', function(){
+test('Class/widget/util', function(){
 	iCat.Class('Person', {
 		Create: function(name, age){
 			this.name = name;
@@ -49,7 +49,7 @@ test('Class/widget', function(){
 	//deepEqual(Jim, {name:'Jim', age:23});
 	iCat.log(Jim); Jim.getName();
 	
-	iCat.widget('Teacher', {
+	iCat.addWidget('Teacher', {
 		Create: function(name, age, subject){
 			Person.call(this, name, age);
 			//arguments.callee.prototype = Person.prototype;
@@ -59,18 +59,26 @@ test('Class/widget', function(){
 	});
 	
 	/*iCat.foreach(Person.prototype, function(k, v){
-		iCat.Teacher.prototype[k] = v;
+		iCat.Widget.Teacher.prototype[k] = v;
 	});*/
-	iCat.mix(iCat.Teacher.prototype, Person.prototype);
-	var Tom = new iCat.Teacher('Tom', 28, 'English');
+	iCat.mix(iCat.Widget.Teacher.prototype, Person.prototype);
+	var Tom = new iCat.Widget.Teacher('Tom', 28, 'English');
 	Tom.getName();
+
+
+	iCat.addUtil('fnMethod', function(msg){
+		alert(msg);
+	});
+
+	iCat.Util.fnMethod('test method');
+	iCat.log(iCat);
 });
 
 test('app/namespace', function(){
 	iCat.app('aaa');
 	equal(iCat.isObject(aaa), true);
 	equal(iCat.isFunction(aaa.namespace), true);
-	equal(iCat.isFunction(aaa.foreach), true);
+	equal(iCat.isFunction(aaa.foreach), false, 'aaa对象没有foreach方法.');
 	
 	aaa.namespace('bbb');
 	equal(iCat.isObject(aaa.bbb), true);

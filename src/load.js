@@ -1,3 +1,4 @@
+/** load.js */
 (function(iCat){
 	var doc = document,
 		ohead = doc.head || doc.getElementsByTagName('head')[0],

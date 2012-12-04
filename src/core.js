@@ -162,8 +162,14 @@
 			}
 		},
 		
-		widget: function(name, cfg){
-			this.Class(name, cfg, iCat);
+		addWidget: function(name, cfg){
+			this.namespace('Widget');
+			this.Class(name, cfg, iCat.Widget);
+		},
+
+		addUtil: function(name, fn){
+			this.namespace('Util');
+			iCat.Util[name] = fn;
 		},
 		
 		// iCat或app下的namespace，相当于扩展出的对象
@@ -195,7 +201,7 @@
 		
 		// print some msg for unit testing
 		log: function(msg) {
-            root.console!==undefined && console.log ? console.log(msg) : alert(msg);
+			root.console!==undefined && console.log ? console.log(msg) : alert(msg);
         }
 	});
 }).call(this);
