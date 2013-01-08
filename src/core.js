@@ -16,6 +16,7 @@
 	var _ua = navigator.userAgent, ObjProto = Object.prototype,
 		toString = ObjProto.toString,
 		nativeIsArray = Array.isArray,
+		docElem = document.documentElement,
         __APP_MEMBERS = ['namespace'];// iCat.app() with these members.
 	
 	// Copies all the properties of s to r.
@@ -83,6 +84,40 @@
 		
 		isNull: function(obj){
 			return obj === null;
+		},
+
+		parentIfText: function(node){
+			return 'tagName' in node ? node : node.parentNode;
+		},
+
+		matches: function(el, selector){
+			var match = docElem.matchesSelector || docElem.mozMatchesSelector || docElem.webkitMatchesSelector ||
+					docElem.oMatchesSelector || docElem.msMatchesSelector;
+			return match.call(el,selector);
+		},
+
+		hasItem: function(item, items){
+			for(var i=0, len=items.length; i<len; i++){
+				if(items[i]==item){
+					return true;
+				}
+			}
+			return false;
+		},
+
+		preventDefault: function(evt){
+			if(evt && evt.preventDefault)
+				evt.preventDefault();
+			else
+				window.event.returnValue = false;
+		},
+
+		stopPropagation: function(evt){
+			if(window.event){
+				window.event.cancelBubble = true;
+			} else {
+				evt.stopPropagation();
+			}
 		},
 		
 		// Handles objects with the built-in 'foreach', arrays, and raw objects.
@@ -162,14 +197,12 @@
 			}
 		},
 		
-		addWidget: function(name, cfg){
-			this.namespace('Widget');
-			this.Class(name, cfg, iCat.Widget);
+		widget: function(name, cfg){
+			this.Class(name, cfg, iCat.widget);
 		},
 
-		addUtil: function(name, fn){
-			this.namespace('Util');
-			iCat.Util[name] = fn;
+		util: function(name, fn){
+			iCat.util[name] = fn;
 		},
 		
 		// iCat或app下的namespace，相当于扩展出的对象
