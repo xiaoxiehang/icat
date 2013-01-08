@@ -1,17 +1,25 @@
 module.exports = function(grunt) {
 
+  "use strict";
+
   // Project configuration.
   grunt.initConfig({
     pkg: '<json:package.json>',
     test: {
-      files: ['test/**/*.js']
+      files: ['test/*.js']
     },
     lint: {
-      files: ['grunt.js', 'lib/**/*.js', 'test/**/*.js']
+      files: ['grunt.js', 'lib/*.js', 'test/*.js']
     },
     watch: {
       files: '<config:lint.files>',
       tasks: 'default'
+    },
+    build: {
+      'lib/icat.js': [
+        'src/core.js',
+        'src/load.js'
+      ]
     },
     jshint: {
       options: {

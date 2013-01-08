@@ -1,5 +1,10 @@
 /** event.js */
 (function(iCat){
+	
+	String.prototype.trim = function(){
+		return this.replace(/(^\s*)|(\s*$)/g, );
+	};
+
 	iCat.Class('Observer', {
 		Create: function(pageid){
 			this.events = {};
@@ -19,13 +24,14 @@
 			iCat.foreach(o, function(i,v){
 				/*var key = v.el.replace(/\s|\W/g,'')+v.eType;
 				self.selectors[key] = v.el;*/
-				var key = v.el;
+				var key = v.el.trim(),
+					eType = v.eType.trim();
 
-				if(!self.events[v.eType])
-					self.events[v.eType] = {}; //{'click':{}, 'longTap':{}}
+				if(!self.events[eType])
+					self.events[eType] = {}; //{'click':{}, 'longTap':{}}
 
-				if(!self.events[v.eType][key])
-					self.events[v.eType][key] = v.callback; // {'click':{'el1':function, 'el2':function}, 'longTap':{}}
+				if(!self.events[eType][key])
+					self.events[eType][key] = v.callback; // {'click':{'el1':function, 'el2':function}, 'longTap':{}}
 			});
 		},
 
@@ -34,10 +40,15 @@
 			if(!key){
 				self.events = {};
 			} else {
-				/*key = iCat.isArray(key)? key : [key];
+				key = iCat.isArray(key)? key : [key];
 				key.forEach(function(v){
-					delete self.events[v];
-				});*/
+					if(v.indexOf('~')>0){
+						v = v.split('~');
+						delete self.events[v[1].trim()][v[0].trim()];
+					} else {
+						delete self.events[v.trim()];
+					}
+				});
 			}
 		},
 
