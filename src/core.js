@@ -1,4 +1,4 @@
-/** core.js for common functions */
+/** core.js */
 (function(){
 	// Create the root object, 'window' in the browser, or 'global' on the server.
 	var root = this, iCat = {};
@@ -17,7 +17,7 @@
 		toString = ObjProto.toString,
 		nativeIsArray = Array.isArray,
 		docElem = document.documentElement,
-        __APP_MEMBERS = ['namespace'];// iCat.app() with these members.
+		__APP_MEMBERS = ['namespace'];// iCat.app() with these members.
 	
 	// Copies all the properties of s to r.
 	// w(hite)l(ist):白名单, ov(erwrite):覆盖
@@ -119,6 +119,35 @@
 				evt.stopPropagation();
 			}
 		},
+
+		// function throttle
+		throttle: function(opt){
+			var timer = null, t_start;
+
+			var fn = opt.fn,
+				context = opt.context,
+				delay = opt.delay || 100,
+				mustRunDelay = opt.mustRunDelay;
+			
+			return function(){
+				var args = arguments, t_curr = +new Date();
+				context = context || this;
+				
+				clearTimeout(timer);
+				if(!t_start){
+					t_start = t_curr;
+				}
+				if(mustRunDelay && t_curr - t_start >= mustRunDelay){
+					fn.apply(context, args);
+					t_start = t_curr;
+				}
+				else {
+					timer = setTimeout(function(){
+						fn.apply(context, args);
+					}, delay);
+				}
+			};
+		},
 		
 		// Handles objects with the built-in 'foreach', arrays, and raw objects.
 		foreach: function(o, cb, args){
@@ -206,35 +235,35 @@
 		},
 		
 		// iCat或app下的namespace，相当于扩展出的对象
-		namespace: function() {
-            var a = arguments, l = a.length, o = null, i, j, p;
+		namespace: function(){
+			var a = arguments, l = a.length, o = null, i, j, p;
 
-            for (i = 0; i < l; ++i) {
-                p = ('' + a[i]).split('.');
-                o = this;
-                for (j = (root[p[0]] === o) ? 1 : 0; j < p.length; ++j) {
-                    o = o[p[j]] = o[p[j]] || {};
-                }
-            }
-            return o;
-        },
+			for (i=0; i<l; ++i){
+				p = ('' + a[i]).split('.');
+				o = this;
+				for (j = (root[p[0]]===o)? 1:0; j<p.length; ++j){
+					o = o[p[j]] = o[p[j]] || {};
+				}
+			}
+			return o;
+		 },
 		
 		// create a app for some project
-		app: function(name, sx) {
-            var self = this,
+		app: function(name, sx){
+			var self = this,
 				isStr = self.isString(name),
-                O = isStr ? root[name] || {} : name;
+				O = isStr? root[name] || {} : name;
 
-            self.mix(O, self, __APP_MEMBERS, true);
-			self.mix(O, self.isFunction(sx) ? sx() : sx);
-			isStr && (root[name] = O);
+				self.mix(O, self, __APP_MEMBERS, true);
+				self.mix(O, self.isFunction(sx) ? sx() : sx);
+				isStr && (root[name] = O);
 
-            return O;
-        },
+				return O;
+		 },
 		
 		// print some msg for unit testing
 		log: function(msg) {
 			root.console!==undefined && console.log ? console.log(msg) : alert(msg);
-        }
+		 }
 	});
 }).call(this);

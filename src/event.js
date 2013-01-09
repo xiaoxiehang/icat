@@ -2,8 +2,18 @@
 (function(iCat){
 	
 	String.prototype.trim = function(){
-		return this.replace(/(^\s*)|(\s*$)/g, );
+		return this.replace(/(^\s*)|(\s*$)/g, '');
 	};
+
+	/*iCat.Class('_$', {
+		Create: function(el){
+			this.el = el;
+		},
+
+		stopDefault: function(){
+			this.el.setAttribute('onclick', 'return false;');
+		}
+	});*/
 
 	iCat.Class('Observer', {
 		Create: function(pageid){
@@ -18,7 +28,7 @@
 		 */
 		subscribe: function(o){
 			var self = this;
-			if(!o) return;
+			if(!o) return self;
 
 			o = iCat.isArray(o)? o : [o];
 			iCat.foreach(o, function(i,v){
@@ -33,6 +43,8 @@
 				if(!self.events[eType][key])
 					self.events[eType][key] = v.callback; // {'click':{'el1':function, 'el2':function}, 'longTap':{}}
 			});
+
+			return self;
 		},
 
 		unsubscribe: function(key){
@@ -50,6 +62,8 @@
 					}
 				});
 			}
+
+			return self;
 		},
 
 		execute: function(eType, el){
@@ -57,20 +71,47 @@
 			if(!cbs) return;
 
 			iCat.foreach(cbs, function(k, v){
-				if(iCat.matches(el, k))
-					v.call(el, event);
-			})
+				if(iCat.matches(el, k)){
+					/*el.removeAttribute('onclick');
+
+					var ev = document.createEvent('HTMLEvents');
+					ev.initEvent('click', false, true);
+					el.dispatchEvent(ev);*/
+
+					v.call(el);//, new _$(el)
+				}
+			});
+		},
+
+		setCurrent: function(){
+			iCat.__OBSERVER_PAGEID = this.pageid;
+			return this;
+		},
+
+		on: function(selector, eType, callback){
+			return this.subscribe({el:selector, eType:eType, callback:callback});
+		},
+
+		off: function(selector, eType){
+			return this.unsubscribe(selector+'~'+eType);
 		}
 	});
 
-	// iCat观察者
-	iCat.Obs = {};
-	iCat.ObsPage = [];
-	iCat.observer = function(pid){
-		if(!iCat.hasItem(pid,iCat.ObsPage))
-			iCat.ObsPage.push(pid);
-		return iCat.Obs[pid] = new Observer(pid);
+	// iCat创建观察者
+	iCat.obsCreate = function(pid){
+		if(!iCat.obsCreate[pid])
+			iCat.obsCreate[pid] = new Observer(pid);
+		return iCat.obsCreate[pid];
 	};
+
+	// iCat删除观察者
+	iCat.obsDestroy = function(pid){
+		iCat.obsCreate[pid] = null;
+		iCat.__OBSERVER_PAGEID = '__PAGE_EVENT';
+	};
+
+	// 默认观察者
+	iCat.Event = iCat.obsCreate('__PAGE_EVENT');
 
 	// 所有事件的实现都绑定在body上
 	(function(){
@@ -102,12 +143,15 @@
 
 		_bind(document, 'DOMContentLoaded', function(){
 
+			if(!iCat.__OBSERVER_PAGEID || iCat.obsCreate[iCat.__OBSERVER_PAGEID]==null) iCat.__OBSERVER_PAGEID = '__PAGE_EVENT';
+			
 			var bodyNode = doc.body, now, delta,
-				objObs = iCat.Obs[iCat.ObsPage[0]];
+				objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID];
 
 			// start
 			_bind(bodyNode, start_evt, function(evt){
-				//evt.stopPropagation();
+				iCat.preventDefault(evt);
+				iCat.stopPropagation(evt);
 
 				evt = supportTouch? evt.touches[0] : evt;
 				now = Date.now();
@@ -118,6 +162,9 @@
 				touch.x1 = evt.pageX;
 				touch.y1 = evt.pageY;
 
+				// 阻止click触发默认事件
+				touch.el.setAttribute('onclick', 'return false;');
+
 				if(delta>0 && delta<=250) touch.isDoubleTap = true;
 				touch.last = now;
 				longTapTimeout = setTimeout(function(){
@@ -127,10 +174,15 @@
 							touch = {};
 						}
 					}, longTapDelay);
+
+				return false;
 			});
 
 			// being
 			_bind(bodyNode, move_evt, function(evt){
+				iCat.preventDefault(evt);
+				iCat.stopPropagation(evt);
+
 				cancelLongTap();
 				evt = supportTouch? evt.touches[0] : evt;
 				touch.x2 = evt.pageX;
@@ -139,6 +191,8 @@
 
 			// end
 			_bind(bodyNode, end_evt, function(evt){
+				iCat.preventDefault(evt);
+				iCat.stopPropagation(evt);
 				cancelLongTap();
 
 				// double tap (tapped twice within 250ms)
@@ -166,6 +220,9 @@
 
 			// cancel
 			_bind(bodyNode, cancel_evt, function(evt){
+				iCat.preventDefault(evt);
+				iCat.stopPropagation(evt);
+
 				if(touchTimeout) clearTimeout(touchTimeout);
 				if(longTapTimeout) clearTimeout(longTapTimeout);
 				longTapTimeout = touchTimeout = null;
@@ -173,5 +230,4 @@
 			});
 		});
 	})();
-	
 })(ICAT);

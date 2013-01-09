@@ -8,11 +8,23 @@ test('Observer', function(){
 	deepEqual(iCat.mix({bbb:"test aaa"}, {aaa:2, bbb:"test bbb"}, undefined, false), {aaa:2, bbb:"test bbb"});
 });
 
-var home = iCat.observer('home');
-iCat.log(iCat.Obs);
+var Event = iCat.Event;
+Event.on('.pass span.module-name', 'longTap', function(){alert(this.nodeName)});
 
-home.subscribe([
-	{el:'.pass span.module-name', eType:'longTap', callback: function(){iCat.log(this.nodeName);}},
-	{el:'.pass', eType:'click', callback: function(){iCat.log(this.className);}},
-	{el:'a', eType:'click', callback: function(event){event.preventDefault();}}//evt.preventDefault(); this.setAttribute('href','#');
-]);
+var home = iCat.obsCreate('home');
+home.subscribe([//iCat.obsCreate['home']
+		{el:'.pass', eType:'click', callback: function(){alert(this.className);}},
+		{el:'a', eType:'click', callback: function(event){event.preventDefault();}}//evt.preventDefault(); this.setAttribute('href','#');
+	])
+	.on('.test-message', 'singleTap', function(){alert(this.innerText); this.className='aaa';})
+	.setCurrent();//iCat.__OBSERVER_PAGEID = 'home';
+
+//iCat.obsDestroy('home');
+
+/*home = iCat.obsCreate('home');
+home.on('.pass', 'click', function(){alert(this.className);})
+	.setCurrent()
+	.off('.pass', 'click');*/
+
+//Event.setCurrent();//iCat.__OBSERVER_PAGEID = undefined | '' | '__PAGE_EVENT';
+iCat.log(iCat);

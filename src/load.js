@@ -62,7 +62,7 @@
 		if(/^(http|ftp|https):\/\/.*/i.test(url)){//type4，直接输出
 			return url;
 		} else {
-			if(/^\.(\.|~)?\//g.test(url)){//type3
+			if(/^\.{1,2}(~)?\//.test(url)){//type3 ##千万不能带g了
 				if(/^\.\//.test(url))
 					url = url.replace(/^\./, iCat.appRef);
 				if(/^\.{2}\//.test(url))
