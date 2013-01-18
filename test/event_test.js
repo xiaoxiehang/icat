@@ -13,8 +13,8 @@ Event.on('.pass span.module-name', 'longTap', function(){alert(this.nodeName)});
 
 var home = iCat.obsCreate('home');
 home.subscribe([//iCat.obsCreate['home']
-		{el:'.pass', eType:'click', callback: function(){alert(this.className);}},
-		{el:'a', eType:'click', callback: function(event){event.preventDefault();}}//evt.preventDefault(); this.setAttribute('href','#');
+		{el:'.pass', eType:'click', callback:function(){alert(this.nodeName);}},
+		{el:'a', eType:'click', callback:function(event){event.preventDefault();}, stopDefault:true}//evt.preventDefault(); this.setAttribute('href','#');
 	])
 	.on('.test-message', 'singleTap', function(){alert(this.innerText); this.className='aaa';})
 	.setCurrent();//iCat.__OBSERVER_PAGEID = 'home';
@@ -27,4 +27,4 @@ home.on('.pass', 'click', function(){alert(this.className);})
 	.off('.pass', 'click');*/
 
 //Event.setCurrent();//iCat.__OBSERVER_PAGEID = undefined | '' | '__PAGE_EVENT';
-iCat.log(iCat);
+//iCat.log(iCat);
