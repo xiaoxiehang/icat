@@ -15,9 +15,44 @@
 	
 	var _ua = navigator.userAgent, ObjProto = Object.prototype,
 		toString = ObjProto.toString,
-		nativeIsArray = Array.isArray,
-		docElem = document.documentElement,
-		__APP_MEMBERS = ['namespace'];// iCat.app() with these members.
+		ArrProto = Array.prototype,
+
+		// iCat.app() with these members.
+		__APP_MEMBERS = ['namespace'];
+
+	// expand the built-in Objects' functions.
+	String.prototype.trim = function(){
+		return this.replace(/(^\s*)|(\s*$)/g, '');
+	};
+
+	ArrProto.hasItem = function(item){
+		for(var i=0, self=this, len=self.length; i<len; i++){
+			if(self[i]==item){
+				return true;
+			}
+		}
+		return false;
+	};
+
+	ArrProto.removeItem = function(item){
+		for(var i=0, self=this, len=self.length; i<len; i++){
+			if(self[i]==item){
+				self.splice(i, 1);
+			}
+		}
+		return self;
+	};
+
+	ArrProto.unique = function(){
+		var self = this, hash = {}, r = [];
+		for(var i=0, len=self.length; i<len; i++){
+			if(!hash[self[i]]){
+				r.push(self[i]);
+				hash[self[i]] = true;
+			}
+		}
+		return r;
+	};
 	
 	// Copies all the properties of s to r.
 	// w(hite)l(ist):白名单, ov(erwrite):覆盖
@@ -60,10 +95,6 @@
 			mozilla: /mozilla/i.test(_ua) && !/(compatible|webkit)/i.test(_ua)
 		},
 		
-		// common browser
-		/*isIE: (function(){return iCat.browser.msie;})(),
-		ieVersion: iCat.browser.msie? _ua.match(/MSIE(\s)?\d+/i)[0].replace(/MSIE(\s)?/i,'') : -1,*/
-		
 		// Commonly used judgment
 		isFunction: function(obj){
 			return toString.call(obj) == '[object Function]';
@@ -73,7 +104,7 @@
 			return toString.call(obj) == '[object String]';
 		},
 		
-		isArray: nativeIsArray ||
+		isArray: Array.isArray ||
 			function(obj){
 				return toString.call(obj) == '[object Array]';
 			},
@@ -86,38 +117,11 @@
 			return obj === null;
 		},
 
-		parentIfText: function(node){
-			return 'tagName' in node ? node : node.parentNode;
-		},
-
-		matches: function(el, selector){
-			var match = docElem.matchesSelector || docElem.mozMatchesSelector || docElem.webkitMatchesSelector ||
-					docElem.oMatchesSelector || docElem.msMatchesSelector;
-			return match.call(el,selector);
-		},
-
-		hasItem: function(item, items){
-			for(var i=0, len=items.length; i<len; i++){
-				if(items[i]==item){
-					return true;
-				}
+		isEmptyObject: function(obj){
+			for(var name in obj){
+				return false;
 			}
-			return false;
-		},
-
-		preventDefault: function(evt){
-			if(evt && evt.preventDefault)
-				evt.preventDefault();
-			else
-				window.event.returnValue = false;
-		},
-
-		stopPropagation: function(evt){
-			if(window.event){
-				window.event.cancelBubble = true;
-			} else {
-				evt.stopPropagation();
-			}
+			return true;
 		},
 
 		// function throttle

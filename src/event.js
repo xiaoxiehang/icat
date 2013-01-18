@@ -1,30 +1,30 @@
-/** event.js */
 (function(iCat){
 	
-	String.prototype.trim = function(){
-		return this.replace(/(^\s*)|(\s*$)/g, '');
-	};
+	// 创建Event命名空间
+	iCat.namespace('Event');
 
-	/*iCat.Class('_$', {
-		Create: function(el){
-			this.el = el;
-		},
+	function _matches(el, selector){
+		var docElem = document.documentElement,
+			match = docElem.matchesSelector || docElem.mozMatchesSelector || docElem.webkitMatchesSelector ||
+				docElem.oMatchesSelector || docElem.msMatchesSelector;
+		return match.call(el,selector);
+	}
 
-		stopDefault: function(){
-			this.el.setAttribute('onclick', 'return false;');
-		}
-	});*/
+	function _parentIfText(node){
+		return 'tagName' in node ? node : node.parentNode;
+	}
 
+	// 创建Observer类
 	iCat.Class('Observer', {
 		Create: function(pageid){
+			this.selectors = [];
 			this.events = {};
-			//this.selectors = {};
 			this.pageid = pageid;
 		},
 
 		/*
 		 * argus可以是<b>单个对象</b>或<b>对象数组</b>
-		 * o = {el:'.cla', eType:'click', callback: function(){}}
+		 * o = {el:'.cla', eType:'click', callback: function(){}, stopDefault: true, stopBubble:false}
 		 */
 		subscribe: function(o){
 			var self = this;
@@ -32,16 +32,17 @@
 
 			o = iCat.isArray(o)? o : [o];
 			iCat.foreach(o, function(i,v){
-				/*var key = v.el.replace(/\s|\W/g,'')+v.eType;
-				self.selectors[key] = v.el;*/
-				var key = v.el.trim(),
+				if(!self.selectors.hasItem(v.el))
+					self.selectors.push(v.el);
+
+				var key = v.el.trim()+'|'+(v.stopDefault? 1:0)+'|'+(v.stopBubble? 1:0),
 					eType = v.eType.trim();
 
 				if(!self.events[eType])
 					self.events[eType] = {}; //{'click':{}, 'longTap':{}}
 
 				if(!self.events[eType][key])
-					self.events[eType][key] = v.callback; // {'click':{'el1':function, 'el2':function}, 'longTap':{}}
+					self.events[eType][key] = v.callback; // {'click':{'li|0|1':function, '.test a|1|1':function}, 'longTap':{}}
 			});
 
 			return self;
@@ -54,8 +55,8 @@
 			} else {
 				key = iCat.isArray(key)? key : [key];
 				key.forEach(function(v){
-					if(v.indexOf('~')>0){
-						v = v.split('~');
+					if(v.indexOf('|')>0){
+						v = v.split('|');
 						delete self.events[v[1].trim()][v[0].trim()];
 					} else {
 						delete self.events[v.trim()];
@@ -66,21 +67,37 @@
 			return self;
 		},
 
-		execute: function(eType, el){
-			var self = this, cbs = self.events[eType];
+		execute: function(eType, el, argus){
+			var self = this,
+				arrcb = [], cb,
+				cbs = self.events[eType];
 			if(!cbs) return;
 
 			iCat.foreach(cbs, function(k, v){
-				if(iCat.matches(el, k)){
-					/*el.removeAttribute('onclick');
-
-					var ev = document.createEvent('HTMLEvents');
-					ev.initEvent('click', false, true);
-					el.dispatchEvent(ev);*/
-
-					v.call(el);//, new _$(el)
-				}
+				k = k.split('|');
+				(function(){
+					if(_matches(el, k[0])){
+						if(k[1]==0)//值为0，不阻止默认事件
+							iCat.Event.triggerEvent(el, 'click', false, true);
+						
+						k[2]==1?//值为1，不阻止冒泡
+							cb = function(){v.apply(el,argus);} : arrcb.push(function(){v.apply(el,argus);});
+					} else {
+						if(el.parentNode!==doc.body){
+							el = el.parentNode;
+							arguments.callee();
+						}
+					}
+				})();
 			});
+
+			if(cb){
+				cb();//console.log(arrcb);
+			} else if(arrcb.length){
+				for(var i=0, ilen=arrcb.length; i<ilen; i++){
+					arrcb[i]();
+				};
+			}
 		},
 
 		setCurrent: function(){
@@ -88,12 +105,18 @@
 			return this;
 		},
 
-		on: function(selector, eType, callback){
-			return this.subscribe({el:selector, eType:eType, callback:callback});
+		on: function(selector, eType, callback, stopDefault, stopBubble){
+			return this.subscribe({
+				el: selector,
+				eType: eType,
+				callback: callback,
+				stopDefault: stopDefault,
+				stopBubble: stopBubble
+			});
 		},
 
 		off: function(selector, eType){
-			return this.unsubscribe(selector+'~'+eType);
+			return this.unsubscribe(selector+'|'+eType);
 		}
 	});
 
@@ -111,12 +134,111 @@
 	};
 
 	// 默认观察者
-	iCat.Event = iCat.obsCreate('__PAGE_EVENT');
+	var Event = iCat.Event = iCat.obsCreate('__PAGE_EVENT'),
+		doc = document;
+	iCat.mix(Event, {
+		preventDefault: function(evt){
+			if(evt && evt.preventDefault)
+				evt.preventDefault();
+			else
+				window.event.returnValue = false;
+		},
+
+		stopPropagation: function(evt){
+			if(window.event){
+				window.event.cancelBubble = true;
+			} else {
+				evt.stopPropagation();
+			}
+		},
+
+		bindEvent: function(el, eType, handler){
+			if(el.addEventListener){
+				el.addEventListener(eType, handler, false);
+			} else if(el.attachEvent){
+				el.attachEvent('on'+eType, handler);
+			} else {
+				el['on'+type] = handler;
+			}
+		},
+
+		removeEvent: function(el, eType, handler){
+			if(el.removeEventListener){
+				el.removeEventListener(eType, handler, false);
+			} else if(el.detachEvent){
+				el.detachEvent('on'+eType, handler);
+			} else {
+				el['on'+type] = null;
+			}
+		},
+
+		triggerEvent: function(element, type, bubbles, cancelable){
+			if(doc.createEventObject){
+				var evt = doc.createEventObject();
+				element.fireEvent('on'+type, evt);
+			} else {
+				var ev = doc.createEvent('Event');
+				ev.initEvent(type, bubbles, cancelable);
+				element.dispatchEvent(ev);
+			}
+		},
+
+		ready: function(){
+			var _fn = [];
+			var _do = function(){
+				if(!arguments.callee.done){
+					arguments.callee.done = true;
+					for(var i=0; i<_fn.length; i++){
+						_fn[i]();
+					}
+				}
+			};
+
+			if(doc.addEventListener){
+				doc.addEventListener('DOMContentLoaded', _do, false);
+			}
+
+			if(iCat.browser.msie){
+				(function(){
+					try{
+						doc.documentElement.doScroll('left');
+					} catch(e) {
+						setTimeout(arguments.callee, 50);
+						return;
+					}
+					doc.onreadystatechange = function(){
+						if(doc.readyState==='complete'){
+							doc.onreadystatechange = null;
+							_do();
+						}
+					};
+				})();
+			}
+
+			if(iCat.browser.webkit && doc.readyState){
+				(function(){
+					if(doc.readyState!=='loading'){
+						_do();
+					} else {
+						setTimeout(arguments.callee, 10);
+					}
+				})();
+			}
+
+			window.onload = _do;
+
+			return function(fn){
+				if(iCat.isFunction(fn)){
+					_fn[_fn.length] = fn;
+				}
+				return fn;
+			};
+		}()
+	});
 
 	// 所有事件的实现都绑定在body上
 	(function(){
-		var doc = document,
-			touch = {}, touchTimeout,
+		var touch = {}, touchTimeout,
 			supportTouch = 'ontouchstart' in window;
 
 		var start_evt = supportTouch ? 'touchstart' : 'mousedown',
@@ -124,46 +246,40 @@
 			end_evt = supportTouch ? 'touchend' : 'mouseup',
 			cancel_evt = 'touchcancel';
 
+		// common functions
 		function swipeDirection(x1, x2, y1, y2){
 			var xDelta = Math.abs(x1 - x2), yDelta = Math.abs(y1 - y2);
 			return xDelta >= yDelta ? (x1 - x2 > 0 ? 'Left' : 'Right') : (y1 - y2 > 0 ? 'Up' : 'Down');
 		}
 
 		var longTapDelay = 750, longTapTimeout;
-
 		function cancelLongTap(){
 			if(longTapTimeout)
 				clearTimeout(longTapTimeout);
 			longTapTimeout = null;
 		}
 
-		function _bind(el, eType, callback){
-			el.addEventListener(eType, callback, false);
-		}
-
-		_bind(document, 'DOMContentLoaded', function(){
+		Event.ready(function(){
 
 			if(!iCat.__OBSERVER_PAGEID || iCat.obsCreate[iCat.__OBSERVER_PAGEID]==null) iCat.__OBSERVER_PAGEID = '__PAGE_EVENT';
 			
-			var bodyNode = doc.body, now, delta,
-				objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID];
+			var bodyNode = doc.querySelector('*[data-pagerole=body]'),
+				now, delta;
+			if(!bodyNode) return;
 
 			// start
-			_bind(bodyNode, start_evt, function(evt){
-				iCat.preventDefault(evt);
-				iCat.stopPropagation(evt);
-
+			Event.bindEvent(bodyNode, start_evt, function(evt){
+				Event.preventDefault(evt);
+				Event.stopPropagation(evt);
+				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID];
 				evt = supportTouch? evt.touches[0] : evt;
 				now = Date.now();
 				delta = now - (touch.last || now);
-				touch.el = iCat.parentIfText(evt.target);
+				touch.el = _parentIfText(evt.target);
 				touchTimeout && clearTimeout(touchTimeout);
 
 				touch.x1 = evt.pageX;
 				touch.y1 = evt.pageY;
-
-				// 阻止click触发默认事件
-				touch.el.setAttribute('onclick', 'return false;');
 
 				if(delta>0 && delta<=250) touch.isDoubleTap = true;
 				touch.last = now;
@@ -174,26 +290,29 @@
 							touch = {};
 						}
 					}, longTapDelay);
-
-				return false;
 			});
 
-			// being
-			_bind(bodyNode, move_evt, function(evt){
-				iCat.preventDefault(evt);
-				iCat.stopPropagation(evt);
-
+			// doing
+			Event.bindEvent(bodyNode, move_evt, function(evt){
+				Event.preventDefault(evt);
+				Event.stopPropagation(evt);
 				cancelLongTap();
+				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID];
+
 				evt = supportTouch? evt.touches[0] : evt;
 				touch.x2 = evt.pageX;
 				touch.y2 = evt.pageY;
+
+				objObs.execute('moving', touch.el, [touch.x1, touch.x2, touch.y1, touch.y2]);
+				objObs.execute('swiping', touch.el, [touch.x1, touch.x2, touch.y1, touch.y2]);
 			});
 
 			// end
-			_bind(bodyNode, end_evt, function(evt){
-				iCat.preventDefault(evt);
-				iCat.stopPropagation(evt);
+			Event.bindEvent(bodyNode, end_evt, function(evt){
+				Event.preventDefault(evt);
+				Event.stopPropagation(evt);
 				cancelLongTap();
+				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID];
 
 				// double tap (tapped twice within 250ms)
 				if(touch.isDoubleTap){
@@ -219,14 +338,36 @@
 			});
 
 			// cancel
-			_bind(bodyNode, cancel_evt, function(evt){
-				iCat.preventDefault(evt);
-				iCat.stopPropagation(evt);
+			Event.bindEvent(bodyNode, cancel_evt, function(evt){
+				Event.preventDefault(evt);
+				Event.stopPropagation(evt);
 
 				if(touchTimeout) clearTimeout(touchTimeout);
 				if(longTapTimeout) clearTimeout(longTapTimeout);
 				longTapTimeout = touchTimeout = null;
 				touch = {};
+			});
+
+			// Stops the default click event
+			Event.bindEvent(bodyNode, 'click', function(evt){
+				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID],
+					el = _parentIfText(evt.target),
+					selectors = objObs.selectors;
+				if(!el || el==doc.body) return;
+
+				for(var i=0; i<selectors.length; i++){
+					(function(){
+						if(_matches(el, selectors[i])){
+							Event.preventDefault(evt);
+							Event.stopPropagation(evt);
+						} else {
+							if(el.parentNode!==doc.body){
+								el = el.parentNode;
+								arguments.callee();
+							}
+						}
+					})();
+				}
 			});
 		});
 	})();
