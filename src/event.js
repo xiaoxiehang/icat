@@ -69,35 +69,35 @@
 
 		execute: function(eType, el, argus){
 			var self = this,
-				arrcb = [], cb,
 				cbs = self.events[eType];
 			if(!cbs) return;
 
 			iCat.foreach(cbs, function(k, v){
 				k = k.split('|');
-				(function(){
-					if(_matches(el, k[0])){
+				(function(node, cb){
+					if(_matches(node, k[0])){
+						cb.apply(node, argus);
+
 						if(k[1]==0)//值为0，不阻止默认事件
-							iCat.Event.triggerEvent(el, 'click', false, true);
+							iCat.Event.triggerEvent(node, 'click', false, true);
 						
-						k[2]==1?//值为1，不阻止冒泡
-							cb = function(){v.apply(el,argus);} : arrcb.push(function(){v.apply(el,argus);});
+						if(k[2]==1)//值为1，不阻止冒泡
+							node.setAttribute('break', 'true');
 					} else {
-						if(el.parentNode!==doc.body){
-							el = el.parentNode;
-							arguments.callee();
+						if(node.getAttribute('break')=='true' || node.parentNode!==doc.body){
+							arguments.callee(node.parentNode, cb);
 						}
 					}
-				})();
+				})(el, v);
 			});
 
-			if(cb){
+			/*if(cb){
 				cb();//console.log(arrcb);
 			} else if(arrcb.length){
 				for(var i=0, ilen=arrcb.length; i<ilen; i++){
 					arrcb[i]();
 				};
-			}
+			}*/
 		},
 
 		setCurrent: function(){

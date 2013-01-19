@@ -13,8 +13,8 @@ Event.on('.pass span.module-name', 'longTap', function(){alert(this.nodeName)});
 
 var home = iCat.obsCreate('home');
 home.subscribe([//iCat.obsCreate['home']
-		{el:'.pass', eType:'click', callback:function(){alert(this.nodeName);}},
-		{el:'a', eType:'click', callback:function(event){event.preventDefault();}, stopDefault:true}//evt.preventDefault(); this.setAttribute('href','#');
+		{el:'a', eType:'click', callback:function(){alert(this.nodeName);}, stopDefault:true, stopBubble:true},
+		{el:'.pass', eType:'click', callback:function(){alert(this.nodeName);}}
 	])
 	.on('.test-message', 'singleTap', function(){alert(this.innerText); this.className='aaa';})
 	.setCurrent();//iCat.__OBSERVER_PAGEID = 'home';
