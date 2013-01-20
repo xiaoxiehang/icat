@@ -38,6 +38,24 @@
 				var key = v.el.trim()+'|'+(v.stopDefault? 1:0)+'|'+(v.stopBubble? 1:0),
 					eType = v.eType.trim();
 
+				switch(eType) {
+					case 'click':
+						eType = 'tap';
+						break;
+					case 'longClick':
+						eType = 'longTap';
+						break;
+					case 'doubleClick':
+						eType = 'doubleTap';
+						break;
+					case 'singleClick':
+						eType = 'singleTap';
+						break;
+					case 'moving':
+						eType = 'swiping';
+						break;
+				}
+
 				if(!self.events[eType])
 					self.events[eType] = {}; //{'click':{}, 'longTap':{}}
 
@@ -68,36 +86,29 @@
 		},
 
 		execute: function(eType, el, argus){
-			var self = this,
+			var self = this, key,
 				cbs = self.events[eType];
 			if(!cbs) return;
 
-			iCat.foreach(cbs, function(k, v){
-				k = k.split('|');
+			for(key in cbs){
+				var k = key.split('|'),
+					iamhere = false;
 				(function(node, cb){
 					if(_matches(node, k[0])){
 						cb.apply(node, argus);
-
 						if(k[1]==0)//值为0，不阻止默认事件
 							iCat.Event.triggerEvent(node, 'click', false, true);
-						
-						if(k[2]==1)//值为1，不阻止冒泡
-							node.setAttribute('break', 'true');
+						iamhere = true;
 					} else {
-						if(node.getAttribute('break')=='true' || node.parentNode!==doc.body){
+						if(node.parentNode!==doc.body){
 							arguments.callee(node.parentNode, cb);
 						}
 					}
-				})(el, v);
-			});
-
-			/*if(cb){
-				cb();//console.log(arrcb);
-			} else if(arrcb.length){
-				for(var i=0, ilen=arrcb.length; i<ilen; i++){
-					arrcb[i]();
-				};
-			}*/
+				})(el, cbs[key]);
+				
+				if(iamhere && k[2]==1)//值为1，阻止冒泡
+					return;
+			}
 		},
 
 		setCurrent: function(){
@@ -302,9 +313,7 @@
 				evt = supportTouch? evt.touches[0] : evt;
 				touch.x2 = evt.pageX;
 				touch.y2 = evt.pageY;
-
 				objObs.execute('moving', touch.el, [touch.x1, touch.x2, touch.y1, touch.y2]);
-				objObs.execute('swiping', touch.el, [touch.x1, touch.x2, touch.y1, touch.y2]);
 			});
 
 			// end
@@ -317,16 +326,13 @@
 				// double tap (tapped twice within 250ms)
 				if(touch.isDoubleTap){
 					objObs.execute('doubleTap', touch.el);
-					objObs.execute('doubleClick', touch.el);
 					touch = {};
 				} else if('last' in touch) {
 					objObs.execute('tap', touch.el);
-					objObs.execute('click', touch.el);
 
 					touchTimeout = setTimeout(function(){
 						touchTimeout = null;
 						objObs.execute('singleTap', touch.el);
-						objObs.execute('singleClick', touch.el);
 						touch = {};
 					}, 250);
 				} else if((touch.x2&&Math.abs(touch.x1-touch.x2)>30) || (touch.y2&&Math.abs(touch.y1-touch.y2)>30)){
