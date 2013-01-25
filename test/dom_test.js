@@ -11,6 +11,7 @@ test('Dom', function(){
 window.addEventListener('load', function(){
 	var Dom = iCat.Dom;
 	var el = Dom.one('#qunit-header');
-	Dom.addClass(el, 'ccc');
-	iCat.log(Dom.one('.ccc'))
+	Dom.replaceClass(el, 'testCla', 'ccc');Dom.css(el, 'opacity')
+	iCat.log(Dom.height(el))
+	Dom.position(el, {left:19, top:28})
 });
