@@ -37,41 +37,26 @@
 	iCat.mix(Dom, {
 
 		one: function(s, cx){
-			if(!s)
-				return doc;
-			else {
-				s = s.replace(/^\s|\s$/g, '');
-				return (cx || doc).querySelector(s);
-			}
+			return !s? doc : (cx || doc).querySelector(s);
 		},
 
 		all: function(s, cx){
-			var arr = [];
-			if(!s)
-				arr.push(doc);
-			else {
-				s = s.replace(/^\s|\s$/g, '');
-				var els = (cx || doc).querySelectorAll(s),
-					l = els.length;
-				for(var i=0; i<l; i++){
-					arr.push(els[i]);
-				}
-			}
-			return arr;
+			return !s? [doc] :
+				Array.prototype.slice.call(
+					(cx || doc).querySelectorAll(s)
+				);
 		},
 
 		filter: function(els, s){
 			if(!els.length || !s)
 				return els;
-			else {
-				var slr = s.replace(/^\s|\s$/g, ''),
-					newEls = [];
-				iCat.foreach(els, function(i, el){
-					if(_matches(el, slr))
-						newEls.push(el);
-				});
-				return newEls;
-			}
+			
+			var newEls = [];
+			iCat.foreach(els, function(i, el){
+				if(_matches(el, s))
+					newEls.push(el);
+			});
+			return newEls;
 		},
 
 		index: function(el, els){}
@@ -81,10 +66,12 @@
 	iCat.mix(Dom, {
 
 		parent: function(el){
+			el = iCat.isArray(el)? el[0] : el;
 			if(el) return el.parentNode;
 		},
 
 		parents: function(el, s){
+			el = iCat.isArray(el)? el[0] : el;
 			if(!s || typeof s=='number'){
 				s = s || 1;
 				for(var i=0; i<s; i++){
@@ -109,7 +96,7 @@
 		},
 
 		children: function(el, s){
-			el.childNodes;
+			el = iCat.isArray(el)? el[0] : el;
 			var c_els = el.childNodes,
 				l = c_els.length,
 				arr = [];
@@ -129,7 +116,7 @@
 		siblings: function(){},
 
 		prev: function(el, s){
-			if(!el) return;
+			el = iCat.isArray(el)? el[0] : el;
 			if(!s){
 				do {
 					el = el.previousSibling;
@@ -150,7 +137,7 @@
 		},
 
 		next: function(el, s){
-			if(!el) return;
+			el = iCat.isArray(el)? el[0] : el;
 			if(!s){
 				do {
 					el = el.nextSibling;
@@ -172,11 +159,13 @@
 		},
 
 		first: function(el){
+			el = iCat.isArray(el)? el[0] : el;
 			el = el.firstChild;
 			return el && el.nodeType!=1? Dom.next(el) : el;
 		},
 
 		last: function(el){
+			el = iCat.isArray(el)? el[0] : el;
 			el = el.lastChild;
 			return el && el.nodeType!=1? Dom.prev(el) : el;
 		},
@@ -190,6 +179,7 @@
 	iCat.mix(Dom, {
 
 		hasClass: function(el, cla){
+			el = iCat.isArray(el)? el[0] : el;
 			return new RegExp('(?:^|\\s+)'+cla+'(?:\\s+|$)').test(el.className);
 		},
 
@@ -382,25 +372,28 @@
 	$.fn = $.prototype = {
 		constructor: $,
 		init: function(s, cx){
-			this.selector = [];
-			if(iCat.isString(s))
-				this.selector = Dom.all(s, cx);
-			else {
-				this.selector = s;
-			}
+			this.selector = iCat.isString(s)? Dom.all(s, cx) : s;
 			return this;
+		},
+
+		size: function(){
+			return this.selector.length;
 		}
 	};
 	$.fn.init.prototype = $.fn;
 
-	for(var k in Dom){
-		if(k=='one' || k=='all') continue;
+	iCat.foreach(Dom, function(k, v){
+		if(k=='one' || k=='all') return;
 		$.fn[k] = function(){
 			var arr = Array.prototype.slice.call(arguments); 
-			if(this.selector) arr.unshift(this.selector);
-			return Dom[k].apply(this.selector||this, arr) || this;
-		};
-	}
+			if(this.selector)
+				arr.unshift(this.selector);
+			var rv = v.apply(this.selector||this, arr) || this;
+			if(rv.nodeType && rv.nodeType==1)
+				rv = $(rv);
+			return rv;
+		}
+	});
 
 	$.extend = $.fn.extend = function(o){
 		if(!iCat.isObject(o)) return this;

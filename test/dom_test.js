@@ -13,15 +13,14 @@ window.addEventListener('load', function(){
 	/*var el = Dom.one('#qunit-header');
 	Dom.replaceClass(el, 'testCla', 'ccc');*/
 	var $ = iCat.$,
-		el = $('#qunit-tests'),
-		elx = $('.testCla');
+		el = $(' h1, h2, div ');
 	//Dom.addClass(el, 'abc');
 	el.css({color:'red'}).addClass('aaa');
 	$.extend({
 		testfn: function(){console.log(this)}
 	});
 	$.fn.extend({
-		testfn: function(){console.log(elx);}//[0].css('color')
+		testfn: function(){console.log(el.prev());}//[0].css('color')
 	})
 
 	//$.testfn();
