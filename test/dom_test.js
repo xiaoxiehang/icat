@@ -10,8 +10,22 @@ test('Dom', function(){
 
 window.addEventListener('load', function(){
 	var Dom = iCat.Dom;
-	var el = Dom.one('#qunit-header');
-	Dom.replaceClass(el, 'testCla', 'ccc');Dom.css(el, 'opacity')
-	iCat.log(Dom.height(el))
-	Dom.position(el, {left:19, top:28})
+	/*var el = Dom.one('#qunit-header');
+	Dom.replaceClass(el, 'testCla', 'ccc');*/
+	var $ = iCat.$,
+		el = $('#qunit-tests'),
+		elx = $('.testCla');
+	//Dom.addClass(el, 'abc');
+	el.css({color:'red'}).addClass('aaa');
+	$.extend({
+		testfn: function(){console.log(this)}
+	});
+	$.fn.extend({
+		testfn: function(){console.log(elx);}//[0].css('color')
+	})
+
+	//$.testfn();
+	el.testfn();
+	//iCat.log(el.addClass);
+	//Dom.position(el, {left:'19px', top:'28px'});
 });
