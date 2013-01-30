@@ -5,7 +5,7 @@
 	iCat.namespace('Dom');
 
 	var Dom = iCat.Dom,
-		doc = document,
+		doc = document, apSlice = Array.prototype.slice,
 		testStyle = doc.createElement('div').style,
 
 		vendor = function(){//检测css3支持前缀
@@ -37,12 +37,12 @@
 	iCat.mix(Dom, {
 
 		one: function(s, cx){
-			return !s? doc : (cx || doc).querySelector(s);
+			return !s? doc : (cx||doc).querySelector(s);
 		},
 
 		all: function(s, cx){
 			return !s? [doc] :
-				Array.prototype.slice.call(
+				apSlice.call(
 					(cx || doc).querySelectorAll(s)
 				);
 		},
@@ -52,10 +52,11 @@
 				return els;
 			
 			var newEls = [];
-			iCat.foreach(els, function(i, el){
+			els.forEach(function(el){
 				if(_matches(el, s))
 					newEls.push(el);
 			});
+
 			return newEls;
 		},
 
@@ -66,108 +67,195 @@
 	iCat.mix(Dom, {
 
 		parent: function(el){
-			el = iCat.isArray(el)? el[0] : el;
-			if(el) return el.parentNode;
+			if(!el) return null;
+
+			if(!iCat.isArray(el)){
+				return el.parentNode;
+			} else {
+				if(!el.length) return null;
+
+				var arr = [];
+				for(var i=0, l=el.length; i<l; i++){
+					var item = arguments.callee(el[i]);
+					if(!arr.hasItem(item))
+						arr.push(item);
+				}
+				return arr;
+			}
 		},
 
 		parents: function(el, s){
-			el = iCat.isArray(el)? el[0] : el;
-			if(!s || typeof s=='number'){
-				s = s || 1;
-				for(var i=0; i<s; i++){
-					if(!iCat.isNull(el))
-						el = el.parentNode;
-					else
-						return null;
-				}
-			} else {
-				(function(){
-					el = el.parentNode;
-					if(iCat.isNull(el)) return;
-					if(_matches(el,s)){
-						return;
-					} else {
-						arguments.callee();
-					}
-				})();
-			}
+			if(!el) return null;
 
-			return el;
+			if(!iCat.isArray(el)){
+				if(!s || typeof s=='number'){
+					s = s || 1;
+					for(var i=0; i<s; i++){
+						if(!iCat.isNull(el))
+							el = el.parentNode;
+					}
+				} else {
+					(function(){
+						el = el.parentNode;
+						if(iCat.isNull(el)) return;
+						if(_matches(el,s)){
+							return;
+						} else {
+							arguments.callee();
+						}
+					})();
+				}
+				return el;
+			} else {
+				if(!el.length) return null;
+
+				var arr = [];
+				for(var i=0, l=el.length; i<l; i++){
+					var item = arguments.callee(el[i], s);
+					if(!arr.hasItem(item))
+						arr.push(item);
+				}
+				return arr;
+			}
 		},
 
 		children: function(el, s){
-			el = iCat.isArray(el)? el[0] : el;
-			var c_els = el.childNodes,
-				l = c_els.length,
-				arr = [];
-			for(var i=0; i<l; i++){
-				var e = c_els[i];
-				if(!s){
-					if(e.nodeType==1)
-						arr.push(e);
-				} else {
-					if(e.nodeType==1 && _matches(e,s))
-						arr.push(e);
+			if(!el) return null;
+
+			if(!iCat.isArray(el)){
+				var c_els = el.childNodes,
+					l = c_els.length,
+					arr = [];
+				for(var i=0; i<l; i++){
+					var e = c_els[i];
+					if(!s){
+						if(e.nodeType==1 && !arr.hasItem(e))
+							arr.push(e);
+					} else {
+						if(e.nodeType==1 && _matches(e,s) && !arr.hasItem(e))
+							arr.push(e);
+					}
 				}
+				return arr;
+			} else {
+				if(!el.length) return null;
+
+				var _arr = [];
+				for(var i=0, l=el.length; i<l; i++){
+					var item = arguments.callee(el[i], s);
+					_arr = _arr.concat(item);
+				}
+				return _arr;//.unique()
 			}
-			return arr;
 		},
 
 		siblings: function(){},
 
 		prev: function(el, s){
-			el = iCat.isArray(el)? el[0] : el;
-			if(!s){
-				do {
-					el = el.previousSibling;
-				} while (el && el.nodeType!=1);
-			} else {
-				(function(){
-					el = el.previousSibling;
+			if(!el) return null;
 
-					if(iCat.isNull(el)) return;
-					if(el.nodeType==1 && _matches(el,s)){
-						return;
-					} else {
-						arguments.callee();
-					}
-				})();
+			if(!iCat.isArray(el)){
+				if(!s){
+					do {
+						el = el.previousSibling;
+					} while (el && el.nodeType!=1);
+				} else {
+					(function(){
+						el = el.previousSibling;
+
+						if(iCat.isNull(el)) return;
+						if(el.nodeType==1 && _matches(el,s)){
+							return;
+						} else {
+							arguments.callee();
+						}
+					})();
+				}
+				return el;
+			} else {
+				if(!el.length) return null;
+
+				var arr = [];
+				for(var i=0, l=el.length; i<l; i++){
+					var item = arguments.callee(el[i], s);
+					if(!arr.hasItem(item))
+						arr.push(item);
+				}
+				return arr;
 			}
-			return el;
 		},
 
 		next: function(el, s){
-			el = iCat.isArray(el)? el[0] : el;
-			if(!s){
-				do {
-					el = el.nextSibling;
-				} while (el && el.nodeType!=1);
-			} else {
-				(function(){
-					el = el.nextSibling;
+			if(!el) return null;
 
-					if(iCat.isNull(el)) return;
-					if(el.nodeType==1 && _matches(el,s)){
-						return;
-					}
-					else {
-						arguments.callee();
-					}
-				})();
+			if(!iCat.isArray(el)){
+				if(!s){
+					do {
+						el = el.nextSibling;
+					} while (el && el.nodeType!=1);
+				} else {
+					(function(){
+						el = el.nextSibling;
+
+						if(iCat.isNull(el)) return;
+						if(el.nodeType==1 && _matches(el,s)){
+							return;
+						}
+						else {
+							arguments.callee();
+						}
+					})();
+				}
+				return el;
+			} else {
+				if(!el.length) return null;
+
+				var arr = [];
+				for(var i=0, l=el.length; i<l; i++){
+					var item = arguments.callee(el[i], s);
+					if(!arr.hasItem(item))
+						arr.push(item);
+				}
+				return arr;
 			}
-			return el;
 		},
 
 		first: function(el){
-			el = iCat.isArray(el)? el[0] : el;
-			el = el.firstChild;
-			return el && el.nodeType!=1? Dom.next(el) : el;
+			if(!el) return null;
+
+			if(!iCat.isArray(el)){
+				el = el.firstChild;
+				return el && el.nodeType!=1? Dom.next(el) : el;
+			} else {
+				if(!el.length) return null;
+
+				var arr = [];
+				for(var i=0, l=el.length; i<l; i++){
+					var item = arguments.callee(el[i]);
+					if(!arr.hasItem(item))
+						arr.push(item);
+				}
+				return arr;
+			}
 		},
 
 		last: function(el){
-			el = iCat.isArray(el)? el[0] : el;
-			el = el.lastChild;
-			return el && el.nodeType!=1? Dom.prev(el) : el;
+			if(!el) return null;
+
+			if(!iCat.isArray(el)){
+				el = el.lastChild;
+				return el && el.nodeType!=1? Dom.prev(el) : el;
+			} else {
+				if(!el.length) return null;
+
+				var arr = [];
+				for(var i=0, l=el.length; i<l; i++){
+					var item = arguments.callee(el[i]);
+					if(!arr.hasItem(item))
+						arr.push(item);
+				}
+				return arr;
+			}
 		},
 
 		closest: function(el, s){
@@ -179,45 +267,81 @@
 	iCat.mix(Dom, {
 
 		hasClass: function(el, cla){
-			el = iCat.isArray(el)? el[0] : el;
-			return new RegExp('(?:^|\\s+)'+cla+'(?:\\s+|$)').test(el.className);
+			if(!el) return null;
+
+			if(!iCat.isArray(el)){
+				el = iCat.isArray(el)? el[0] : el;
+				return new RegExp('(?:^|\\s+)'+cla+'(?:\\s+|$)').test(el.className);
+			} else {
+				if(!el.length) return null;
+
+				var arr = [];
+				for(var i=0, l=el.length; i<l; i++){
+					arr.push(arguments.callee(el[i]));
+				}
+				return arr;
+			}
 		},
 
 		addClass: function(el, cla){
-			var arr = iCat.isArray(el)? el : [el];
-			iCat.foreach(arr, function(i, e){
-				if(!Dom.hasClass(e,cla)){
-					var cn = e.className;
-					e.className = !cn? cla : [cn, cla].join(' ');
+			if(!el) return;
+
+			if(!iCat.isArray(el)){
+				if(!Dom.hasClass(el,cla)){
+					var cn = el.className;
+					el.className = !cn? cla : [cn, cla].join(' ');
 				}
-			});
+			} else {
+				if(!el.length) return;
+				for(var i=0, l=el.length; i<l; i++){
+					arguments.callee(el[i], cla);
+				}
+			}
 		},
 
 		removeClass: function(el, cla){
-			var arr = iCat.isArray(el)? el : [el];
-			iCat.foreach(arr, function(i, e){
-				if(Dom.hasClass(e,cla)){
-					var cn = e.className;
-					e.className = cn.replace(new RegExp('(?:^|\\s+)'+cla+'(?:\\s+|$)', 'g'), ' ');
+			if(!el) return;
+
+			if(!iCat.isArray(el)){
+				if(Dom.hasClass(el,cla)){
+					var cn = el.className;
+					el.className = cn.replace(new RegExp('(?:^|\\s+)'+cla+'(?:\\s+|$)', 'g'), ' ');
 				}
-			});
+			} else {
+				if(!el.length) return;
+				for(var i=0, l=el.length; i<l; i++){
+					arguments.callee(el[i], cla);
+				}
+			}
 		},
 
 		replaceClass: function(el, oldcla, newcla){
-			var arr = iCat.isArray(el)? el : [el];
-			iCat.foreach(arr, function(i, e){
-				if(Dom.hasClass(e,oldcla)){
-					var cn = e.className;
-					e.className = cn.replace(new RegExp('(?:^|\\s+)'+oldcla+'(?:\\s+|$)','g'), ' '+newcla+' ').replace(/^\s+|\s+$/g,'');
+			if(!el) return;
+
+			if(!iCat.isArray(el)){
+				if(Dom.hasClass(el,oldcla)){
+					var cn = el.className;
+					el.className = cn.replace(new RegExp('(?:^|\\s+)'+oldcla+'(?:\\s+|$)','g'), ' '+newcla+' ').replace(/^\s+|\s+$/g,'');
 				}
-			});
+			} else {
+				if(!el.length) return;
+				for(var i=0, l=el.length; i<l; i++){
+					arguments.callee(el[i], oldcla, newcla);
+				}
+			}
 		},
 
 		toggleClass: function(el, cla){
-			var arr = iCat.isArray(el)? el : [el];
-			iCat.foreach(arr, function(i, e){
-				Dom[Dom.hasClass(e,cla)? 'removeClass' : 'addClass'](e, cla);
-			});
+			if(!el) return;
+
+			if(!iCat.isArray(el)){
+				Dom[Dom.hasClass(el,cla)? 'removeClass' : 'addClass'](el, cla);
+			} else {
+				if(!el.length) return;
+				for(var i=0, l=el.length; i<l; i++){
+					arguments.callee(el[i], cla);
+				}
+			}
 		},
 
 		attr: function(){},
@@ -226,6 +350,7 @@
 
 		// 样式 设置时必须有单位
 		css: function(){
+
 			function styleFilter(p){
 				switch(p){
 					case 'float':
@@ -261,91 +386,142 @@
 			}
 
 			function getStyle(el, p){
-				el = iCat.isArray(el)? el[0] : el;
-				p = styleFilter(p);
-				var val = el.style[p];
-				if(!val){
-					var style = doc.defaultView && doc.defaultView.getComputedStyle && getComputedStyle(el, null) || el.currentStyle || el.style;
-					val = iCat.isString(p)? style[p] : p.get(el, style);
+				if(!el) return null;
+
+				if(!iCat.isArray(el)){
+					p = styleFilter(p);
+					var val = el.style[p];
+					if(!val){
+						var style = doc.defaultView && doc.defaultView.getComputedStyle && getComputedStyle(el, null) || el.currentStyle || el.style;
+						val = iCat.isString(p)? style[p] : p.get(el, style);
+					}
+					return val=='auto'? '' : val;
+				} else {
+					if(!el.length) return null;
+
+					var arr = [];
+					for(var i=0, l=el.length; i<l; i++){
+						var item = arguments.callee(el[i], p);
+						arr.push(item);
+					}
+					return arr;
 				}
-				return val=='auto'? '' : val;
 			}
 
 			function setStyle(el, o){
-				if(!iCat.isObject(o)) return;
-				var attr;
-				iCat.foreach(o, function(k, v){
-					attr = styleFilter(k);
-					iCat.isString(attr)? el.style[attr] = v : attr.set(el, v);
-				});
+				if(!el || !iCat.isObject(o)) return;
+
+				if(!iCat.isArray(el)){
+					var attr;
+					iCat.foreach(o, function(k, v){
+						attr = styleFilter(k);
+						iCat.isString(attr)? el.style[attr] = v : attr.set(el, v);
+					});
+				} else {
+					if(!el.length) return;
+					for(var i=0, l=el.length; i<l; i++){
+						arguments.callee(el[i], o);
+					}
+				}
 			}
 
 			return function(el, styleCss){
 				if(iCat.isString(styleCss))
 					return getStyle(el,styleCss);
-				
-				el = iCat.isArray(el)? el : [el];
-				for(var i=0, ilen=el.length; i<ilen; i++){
-					setStyle(el[i], styleCss);
-				}
+				else
+					setStyle(el, styleCss);
 			}
 		}(),
 
 		// 位置 设置时必须有单位
 		position: function(){
-			function getPos(o){
-				var x = 0, y = 0;
-				do {
-					x += o.offsetLeft || 0;
-					y += o.offsetTop || 0;
-					o = o.offsetParent;
-				} while(o);
-				return {'left':x, 'top':y};
+
+			function getPos(el){
+				if(!el) return null;
+
+				if(!iCat.isArray(el)){
+					var x = 0, y = 0;
+					do {
+						x += el.offsetLeft || 0;
+						y += el.offsetTop || 0;
+						el = el.offsetParent;
+					} while(el);
+					return {'left':x, 'top':y};
+				} else {
+					if(!el.length) return null;
+
+					var arr = [];
+					for(var i=0, l=el.length; i<l; i++){
+						var item = arguments.callee(el[i]);
+						arr.push(item);
+					}
+					return arr;
+				}
 			}
 
-			function setPos(o, pos){
-				if(typeof pos=='number')
-					return setPos(o, {left:pos});
-				var st = {},
-					isX = typeof pos.left!='undefined',
-					isY = typeof pos.top!='undefined';
-				if(hasTransition){
-					if(isX && isY){
-						st[cssVendor+'transform'] = 'translate('+pos.left+', '+pos.top+')';
-					}else{
-						if(isX)
-							st[cssVendor+'transform'] = 'translateX('+pos.left+')';
-						if(isY)
-							st[cssVendor+'transform'] = 'translateY('+pos.top+')';
-					}
-				} else {
-					if(isX)
-						st['left'] = pos.left;
-					if(isY)
-						st['top'] = pos.top;
-				}
+			function setPos(el, pos){
+				if(!el) return;
 
-				Dom.css(o, st);
-				return st;
+				if(!iCat.isArray(el)){
+					pos = typeof pos=='number'? pos+'px' : pos;
+					if(iCat.isString(pos))
+						return setPos(el, {left:pos});
+					var st = {},
+						isX = typeof pos.left!='undefined',
+						isY = typeof pos.top!='undefined',
+						isPosistion = /absolute|relative/i.test(Dom.css(el, 'position'));
+					if(hasTransition && !isPosistion){
+						if(isX && isY){
+							st[cssVendor+'transform'] = 'translate('+pos.left+', '+pos.top+')';
+						}else{
+							if(isX)
+								st[cssVendor+'transform'] = 'translateX('+pos.left+')';
+							if(isY)
+								st[cssVendor+'transform'] = 'translateY('+pos.top+')';
+						}
+					} else {
+						if(isX)
+							st['left'] = pos.left;
+						if(isY)
+							st['top'] = pos.top;
+					}
+
+					Dom.css(el, st);
+				} else {
+					if(!el.length) return;
+					for(var i=0, l=el.length; i<l; i++){
+						arguments.callee(el[i], pos);
+					}
+				}
 			}
 
 			return function(el, pos){
 				if(typeof pos=='undefined')
 					return getPos(el);
-				
-				el = iCat.isArray(el)? el : [el];
-				for(var i=0, ilen=el.length; i<ilen; i++){
-					setPos(el[i], pos);
-				}
+				else
+					setPos(el, pos);
 			}
 		}(),
 
 		// 偏移量 设置时必须有单位
 		offset: function(){
-			function getOffset(o){
-				var x = o.offsetLeft || 0,
-					y = o.offsetTop || 0;
-				return {'left':x, 'top':y};
+			function getOffset(el){
+				if(!el) return null;
+
+				if(!iCat.isArray(el)){
+					var x = el.offsetLeft || 0,
+						y = el.offsetTop || 0;
+					return {'left':x, 'top':y};
+				} else {
+					if(!el.length) return null;
+
+					var arr = [];
+					for(var i=0, l=el.length; i<l; i++){
+						var item = arguments.callee(el[i]);
+						arr.push(item);
+					}
+					return arr;
+				}
 			}
 
 			return function(el, pos){
@@ -364,7 +540,9 @@
 
 	// join dom
 	iCat.mix(Dom, {
-
+		html: function(el, shtml){},
+		before: function(){},
+		after: function(){}
 	});
 
 	// iCat.$ as jQuery
@@ -385,13 +563,26 @@
 	iCat.foreach(Dom, function(k, v){
 		if(k=='one' || k=='all') return;
 		$.fn[k] = function(){
-			var arr = Array.prototype.slice.call(arguments); 
-			if(this.selector)
-				arr.unshift(this.selector);
-			var rv = v.apply(this.selector||this, arr) || this;
-			if(rv.nodeType && rv.nodeType==1)
-				rv = $(rv);
-			return rv;
+			var arr = apSlice.call(arguments),
+				els = this.selector, _arr, isNode; 
+			if(!els.length) return this;
+
+			arr.unshift(els);
+			var rv = v.apply(els||this, arr) || this;
+			if(rv!=this){
+				_arr = [];
+				for(var i=0, l=rv.length; i<l; i++){
+					if(!iCat.isNull(rv[i]) && rv[i].nodeType){
+						_arr.push(rv[i]);
+						isNode = true;
+					}
+				}
+				_arr = isNode? $(_arr) : rv;
+			} else {
+				_arr = rv;
+			}
+			
+			return _arr;
 		}
 	});
 
@@ -402,7 +593,7 @@
 		iCat.foreach(o, function(k, v){
 			if(iCat.isFunction(v)){
 				_self[k] = function(){
-					return v.apply(this.selector||_self, arguments) || this;
+					return v.apply(this.selector||_self, arguments);
 				};
 			} else {
 				_self[k] = v;
@@ -414,7 +605,7 @@
 	// extend jquery's funs
 	$.fn.extend({
 		get: function(num){
-			return num==null? Array.prototype.slice.call(this) :
+			return num==null? apSlice.call(this) :
 				(num<0? this[this.length+num] : this[num]);
 		}
 	});

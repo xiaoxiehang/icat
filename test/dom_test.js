@@ -12,15 +12,19 @@ window.addEventListener('load', function(){
 	var Dom = iCat.Dom;
 	/*var el = Dom.one('#qunit-header');
 	Dom.replaceClass(el, 'testCla', 'ccc');*/
+	//iCat.log(Dom.all('i'));
 	var $ = iCat.$,
-		el = $(' h1, h2, div ');
+		el = $('div');
 	//Dom.addClass(el, 'abc');
-	el.css({color:'red'}).addClass('aaa');
+	el.css({color:'red'}).addClass('ab');
 	$.extend({
 		testfn: function(){console.log(this)}
 	});
 	$.fn.extend({
-		testfn: function(){console.log(el.prev());}//[0].css('color')
+		testfn: function(){
+			console.log(el.get(1))
+			el.prev().addClass('abc').next().next().addClass('rrr');
+		}//console.log()[0].css('color')
 	})
 
 	//$.testfn();
