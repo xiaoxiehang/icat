@@ -280,17 +280,16 @@
 
 			// start
 			Event.bindEvent(bodyNode, start_evt, function(evt){
-				Event.preventDefault(evt);
-				Event.stopPropagation(evt);
-				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID];
-				evt = supportTouch? evt.touches[0] : evt;
+				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID],
+					page = supportTouch? evt.touches[0] : evt;
 				now = Date.now();
 				delta = now - (touch.last || now);
 				touch.el = _parentIfText(evt.target);
 				touchTimeout && clearTimeout(touchTimeout);
 
-				touch.x1 = evt.pageX;
-				touch.y1 = evt.pageY;
+				touch.x1 = page.pageX;
+				touch.y1 = page.pageY;
+				touch.isScrolling = undefined;
 
 				if(delta>0 && delta<=250) touch.isDoubleTap = true;
 				touch.last = now;
@@ -301,46 +300,56 @@
 							touch = {};
 						}
 					}, longTapDelay);
+				Event.stopPropagation(evt);
 			});
 
 			// doing
 			Event.bindEvent(bodyNode, move_evt, function(evt){
-				Event.preventDefault(evt);
-				Event.stopPropagation(evt);
 				cancelLongTap();
-				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID];
-
-				evt = supportTouch? evt.touches[0] : evt;
-				touch.x2 = evt.pageX;
-				touch.y2 = evt.pageY;
-				objObs.execute('moving', touch.el, [touch.x1, touch.x2, touch.y1, touch.y2]);
+				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID],
+					page = supportTouch? evt.touches[0] : evt;
+				touch.x2 = page.pageX;
+				touch.y2 = page.pageY;
+				var distanceX = touch.x2 - touch.x1,
+					distanceY = touch.y2 - touch.y1;
+				if(typeof touch.isScrolling=='undefined'){
+					touch.isScrolling = !!(touch.isScrolling || Math.abs(distanceX)<Math.abs(distanceY));
+				}
+				if(!touch.isScrolling){
+					Event.preventDefault(evt);
+					objObs.execute('swiping', touch.el, [touch.x1, touch.x2, touch.y1, touch.y2]);
+					Event.stopPropagation(evt);
+				}
 			});
 
 			// end
 			Event.bindEvent(bodyNode, end_evt, function(evt){
-				Event.preventDefault(evt);
-				Event.stopPropagation(evt);
 				cancelLongTap();
 				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID];
 
-				// double tap (tapped twice within 250ms)
-				if(touch.isDoubleTap){
-					objObs.execute('doubleTap', touch.el);
-					touch = {};
-				} else if('last' in touch) {
-					objObs.execute('tap', touch.el);
-
-					touchTimeout = setTimeout(function(){
-						touchTimeout = null;
-						objObs.execute('singleTap', touch.el);
+				if(!touch.isScrolling){
+					// double tap (tapped twice within 250ms)
+					if(touch.isDoubleTap){
+						objObs.execute('doubleTap', touch.el);
 						touch = {};
-					}, 250);
-				} else if((touch.x2&&Math.abs(touch.x1-touch.x2)>30) || (touch.y2&&Math.abs(touch.y1-touch.y2)>30)){
-					var swipe = 'swipe' + swipeDirection(touch.x1, touch.x2, touch.y1, touch.y2);
-					objObs.execute(swipe, touch.el);
-					objObs.execute(swipe, touch.el);
+					} else if('last' in touch) {
+						objObs.execute('tap', touch.el);
+
+						touchTimeout = setTimeout(function(){
+							touchTimeout = null;
+							objObs.execute('singleTap', touch.el);
+							touch = {};
+						}, 250);
+					} else if((touch.x2&&Math.abs(touch.x1-touch.x2)>30) || (touch.y2&&Math.abs(touch.y1-touch.y2)>30)){
+						var swipe = 'swipe' + swipeDirection(touch.x1, touch.x2, touch.y1, touch.y2);
+						objObs.execute(swipe, touch.el);
+						objObs.execute(swipe, touch.el);
+						touch = {};
+					}
+				} else {
 					touch = {};
 				}
+				Event.stopPropagation(evt);
 			});
 
 			// cancel
