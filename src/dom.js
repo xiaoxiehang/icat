@@ -53,7 +53,24 @@
 			
 			var newEls = [];
 			els.forEach(function(el){
-				if(_matches(el, s))
+				if(iCat.isString(s) && _matches(el, s))
+					newEls.push(el);
+				if(s.nodeType && el==s)
+					newEls.push(el);
+			});
+
+			return newEls;
+		},
+
+		not: function(els, s){
+			if(!els.length || !s)
+				return els;
+			
+			var newEls = [];
+			els.forEach(function(el){
+				if(iCat.isString(s) && !_matches(el, s))
+					newEls.push(el);
+				if(s.nodeType && el!=s)
 					newEls.push(el);
 			});
 
@@ -149,7 +166,24 @@
 			}
 		},
 
-		siblings: function(){},
+		siblings: function(el, s){
+			if(!el) return null;
+
+			if(!iCat.isArray(el)){
+				var p = el.parentNode,
+					c = Dom.children(p, s);
+				return Dom.not(c, el);
+			} else {
+				if(!el.length) return null;
+
+				var _arr = [];
+				for(var i=0, l=el.length; i<l; i++){
+					var item = arguments.callee(el[i], s);
+					_arr = _arr.concat(item);
+				}
+				return _arr;
+			}
+		},
 
 		prev: function(el, s){
 			if(!el) return null;
@@ -289,7 +323,8 @@
 			if(!iCat.isArray(el)){
 				if(!Dom.hasClass(el,cla)){
 					var cn = el.className;
-					el.className = !cn? cla : [cn, cla].join(' ');
+					cn = !cn? cla : [cn, cla].join(' ');
+					el.className = cn.trim();
 				}
 			} else {
 				if(!el.length) return;
@@ -305,7 +340,8 @@
 			if(!iCat.isArray(el)){
 				if(Dom.hasClass(el,cla)){
 					var cn = el.className;
-					el.className = cn.replace(new RegExp('(?:^|\\s+)'+cla+'(?:\\s+|$)', 'g'), ' ');
+					cn = cn.replace(new RegExp('(?:^|\\s+)'+cla+'(?:\\s+|$)', 'g'), ' ');
+					el.className = cn.trim();
 				}
 			} else {
 				if(!el.length) return;
@@ -321,7 +357,8 @@
 			if(!iCat.isArray(el)){
 				if(Dom.hasClass(el,oldcla)){
 					var cn = el.className;
-					el.className = cn.replace(new RegExp('(?:^|\\s+)'+oldcla+'(?:\\s+|$)','g'), ' '+newcla+' ').replace(/^\s+|\s+$/g,'');
+					cn = cn.replace(new RegExp('(?:^|\\s+)'+oldcla+'(?:\\s+|$)','g'), ' '+newcla+' ');
+					el.className = cn.trim();
 				}
 			} else {
 				if(!el.length) return;
@@ -550,8 +587,20 @@
 	$.fn = $.prototype = {
 		constructor: $,
 		init: function(s, cx){
-			this.selector = iCat.isString(s)? Dom.all(s, cx) : s;
-			return this;
+			if(!s) return this;
+
+			if(s.nodeType){
+				this.selector = [s];
+				return this;
+			}
+
+			if(iCat.isString(s)){
+				this.selector = Dom.all(s, cx);
+				return this;
+			} else if(iCat.isArray(s)){
+				this.selector = s.length? s : [doc];
+				return this;
+			}
 		},
 
 		size: function(){
@@ -564,12 +613,12 @@
 		if(k=='one' || k=='all') return;
 		$.fn[k] = function(){
 			var arr = apSlice.call(arguments),
-				els = this.selector, _arr, isNode; 
+				els = this.selector, _arr, isNode;
 			if(!els.length) return this;
 
 			arr.unshift(els);
-			var rv = v.apply(els||this, arr) || this;
-			if(rv!=this){
+			var rv = v.apply(els||this, arr);
+			if(rv){
 				_arr = [];
 				for(var i=0, l=rv.length; i<l; i++){
 					if(!iCat.isNull(rv[i]) && rv[i].nodeType){
@@ -579,7 +628,7 @@
 				}
 				_arr = isNode? $(_arr) : rv;
 			} else {
-				_arr = rv;
+				_arr = this;
 			}
 			
 			return _arr;
@@ -609,5 +658,4 @@
 				(num<0? this[this.length+num] : this[num]);
 		}
 	});
-
 })(ICAT, document);
