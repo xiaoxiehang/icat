@@ -8,12 +8,18 @@ test('', function(){
 
 /*iCat.require('testMod', ['aaa.js', 'bbb.js'], function(){
 	alert(AAAname+'load complated...');
-});*/
+});
+iCat.log(iCat);*/
 
-//iCat.log(iCat);
 iCat.config({
 	modName: 'aaa',
 	paths: {aaa:'aaa.js', bbb:'bbb.js'}
 });
-iCat.use('aaa');
-//iCat.log(iCat.modsConfig);
+iCat.use('aaa', function(){
+	alert(AAAname+'load complated...');
+});
+iCat.log(iCat.modsConfig);
+
+/*iCat.incfile(['aaa.js', 'bbb.js'], function(){
+	alert(AAAname+'load complated...');
+});*/

@@ -204,27 +204,25 @@
 			if(!f) return;
 			f = iCat.isString(f)? [f] : f;
 			
-			var max = f.length-1;
-			if(isDepend){
-				var i = 0,
-				
-					loadfile = function(){
-						if(i<max){
-							_unblockImport(_dealUrl(f[i]), function(){loadfile();}, undefined, context);
-						} else {
-							_unblockImport(_dealUrl(f[max]), cb, undefined, context);
-						}
-						i++;
-					};
-				loadfile();
-			} else {
-				iCat.foreach(f, function(i, v){
-					i==max ?
-						_unblockImport(_dealUrl(v), cb, undefined, context)
-						:
-						_unblockImport(_dealUrl(v), undefined, undefined, context);
-				});
-			}
+			(function(){
+				if(f.length)
+					var curJS = f.shift();
+				else
+					return;
+
+				if(f.length){
+					var fn = arguments.callee;
+
+					if(isDepend)//文件间有依赖 顺序加载
+						_unblockImport(curJS, function(){fn(f);}, undefined, context);
+					else {
+						_unblockImport(curJS, undefined, undefined, context);
+						fn(f);
+					}
+				} else {
+					_unblockImport(curJS, cb, undefined, context);
+				}
+			})();
 		},
 		
 		/* 加载文件形式：
@@ -238,24 +236,25 @@
 			if(_modGroup[m]){
 				if(cb) cb(context);
 			} else {
-				var max = f.length-1, i = 0,
-				
-					loadfile = function(){
-						if(i<max){
-							_unblockImport(_dealUrl(f[i]), function(){loadfile();}, m, context);
-						} else {
-							_unblockImport(_dealUrl(f[max]), cb, m, context);
-						}
-						i++;
-					};
-				
-				loadfile();
+				(function(){
+					if(f.length)
+						var curJS = f.shift();
+					else
+						return;
+
+					if(f.length){
+						var fn = arguments.callee;
+						_unblockImport(curJS, function(){fn(f);}, m, context);
+					} else {
+						_unblockImport(curJS, cb, m, context);
+					}
+				})();
 			}
 		},
 		
 		//使用已加载后的模块
 		use: function(m, cb, t, context){
-			var i = 0, t = t || 500, timer;
+			var i = 0, t = t || 100, timer;
 			
 			if(_modGroup[m]){
 				if(cb) cb(context);
