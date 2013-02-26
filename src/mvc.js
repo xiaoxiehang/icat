@@ -6,20 +6,30 @@
 			if(!str) return;
 
 			var fn, fnBody= "var p = [];with(jsonData){" +
-								"p.push('" + str.replace(/[\r\t\n]/g, "").replace(/<%=(.*?)%>/g, "',$1,'").replace(/<%(.*?)%>/g, "');$1p.push('") + "');" +
-							"}return p.join('');";
+								"p.push('" + str.replace(/<%=(.*?)%>/g, "',$1,'").replace(/<%(.*?)%>/g, "');$1p.push('") + "');" +
+							"}return p.join('');",
+				regExp = /\W|for|if|else|switch|while|var|length|data|class|id|href|src|title|alt/g;
 			
 			if(!/\W/.test(str)){
-				str = doc.getElementById(str).innerHTML;
-				fn = tmplCache[str] = tmplCache[str] || tmpl(str);
-			}else{
-				fn = tmplCache[str] = tmplCache[str] || new Function("jsonData", fnBody);
+				var tpl = tmplCache[str] = (tmplCache[str] || doc.getElementById(str).innerHTML).replace(/[\r\t\n]/g, ''),
+					key = tpl.replace(regExp, '');
+				fn = tmplCache[key] = tmplCache[key] || tmpl(tpl);
+			} else {
+				var tpl = str.replace(/[\r\t\n]/g, ''),
+					key = tpl.replace(regExp, '');
+				fn = tmplCache[key] = tmplCache[key] || new Function("jsonData", fnBody);
 			}
-					
+			// iCat.log(tmplCache);	
 			return data? fn(data) : fn;
 		};
 
-	// view
+	/*
+	 * view-module职责：
+	 * - 初始化页面刚进入时的模板函数（及数据），渲染模块
+	 * - 接收controler传递过来的数据，并更新渲染模块
+	 * - 获取用户‘输入的数据’或‘模版数据’，传递给controler
+	 * - 销毁自己
+	 */
 	function View(template, data){
 		this.fnTemplate = tmpl(template);
 		this.data = data || {};
@@ -28,7 +38,6 @@
 			this.init();
 		}
 	}
-
 	View.prototype = {
 		init: function(){
 			this._render(this.data);
@@ -59,7 +68,21 @@
 		},
 
 		addItem: function(d){
+			var _self = this,
+				dataItems = _self.data.data;
 
+			if(iCat.isArray(d)){
+				dataItems.concat(d);
+				_self._render({data:d});
+			} else if(iCat.isObject(d)) {
+				if(d.sucess){
+					dataItems.concat(d.data);
+					_self._render(d);
+				} else {
+					dataItems.push(d);
+					_self._render({data:[d]});
+				}
+			}
 		},
 
 		setData: function(d){
@@ -75,36 +98,33 @@
 		destroy: function(){}
 	};
 
-	var temp = '<%for(var i=0; i<data.length; i++){%>\
-				<li class="<%=data[i].jshook%>">\
-					<a href="<%=data[i].link%>">\
-						<span class="icon"><img src="<%=data[i].img%>"></span>\
-						<span class="desc">\
-							<em><%=data[i].title%></em>\
-							<b></b>\
-							<b></b>\
-						</span>\
-					</a>\
-				</li>\
-				<%}%>',
-		
-		data = {
-			sucess:true, msg:'',
-			parentSelector:'.J_itembox',
-			data:[
-				{link:'ccc', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ccc', jshook:'todo'},
-				{link:'ddd', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ddd'},
-				{title:'abc'}
-			]
-		};
+	/*
+	 * model-module职责：
+	 * - 处理controler传递过来的数据，进行封装返回
+	 * - 处理数据层面的业务逻辑，进行封装返回
+	 * - 按需存取数据
+	 * - 销毁自己
+	 */
+	function Model(argument){
+		// body...
+	}
+	Model.prototype = {};
 
-	//console.log(tmpl(temp,data))
-	window.onload = function(){//
-		var pageView = new View(temp, data);
-		var pagex = new View('J_mvcView', data)
-		iCat.log(tmplCache)
-		//pageView.setData(data);
-	};
+	/*
+	 * controler-module职责：
+	 * - 响应用户动作，调用对应的View和Model
+	 * - 在View/Model之间传递数据
+	 * - 如果是apk，添加或调用硬件接口
+	 * - 销毁自己
+	 */
+	function Controler(argument){
+		// body...
+	}
+	Controler.prototype = {};
 
+	// 对外接口
 	iCat.namespace('View', 'Model', 'Controler');
+	iCat.View = View;
+	iCat.Model = Model;
+	iCat.Controler = Controler;
 })(ICAT);

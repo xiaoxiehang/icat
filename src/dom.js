@@ -577,8 +577,13 @@
 
 	// join dom
 	iCat.mix(Dom, {
-		html: function(el, shtml){},
+		html: function(el, shtml){
+			if(!shtml) return;
+			el.innerHTML = shtml;
+		},
+
 		before: function(){},
+		
 		after: function(){}
 	});
 
