@@ -1,0 +1,41 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title></title>
+	<link rel="stylesheet" href="qunit/qunit.css" />
+	<script type="text/javascript" src="qunit/qunit.js"></script>
+	
+	<script id="sysRef" type="text/javascript" src="../src/core.js"></script>
+	<script type="text/javascript" src="../src/mvc.js"></script>
+	<script type="text/javascript" src="mvc_test.js"></script>
+	<style type="text/css">.aaa{height:2rem; }</style>
+</head>
+<body data-pagerole="body">
+	<h1 id="qunit-header" class="testCla aaa bbb">ICAT mvc.js</h1>
+	<h2 id="qunit-banner"></h2>
+	<div id="qunit-testrunner-toolbar"></div>
+	
+	<h2 id="qunit-userAgent"></h2>
+	<ol id="qunit-tests"></ol>
+	<div id="qunit-fixture">
+		<span>lame test markup</span>
+		<span>normal test markup</span>
+		<span>awesome test markup</span>
+	</div>
+	<script type="text/icat-template" id="J_mvcView">
+		<%for(var i=0; i<data.length; i++){%>
+		<li class="<%=data[i].jshook%>">
+			<a href="<%=data[i].link%>">
+				<span class="icon"><img src="<%=data[i].img%>"></span>
+				<span class="desc">
+					<em><%=data[i].title%></em>
+					<b></b>
+					<b></b>
+				</span>
+			</a>
+		</li>
+		<%}%>
+	</script>
+</body>
+</html>
