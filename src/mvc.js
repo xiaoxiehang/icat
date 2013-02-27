@@ -2,13 +2,19 @@
 
 	var doc = document, tmplCache = {},
 
+		fnHook = function(s){
+			return s.replace(/{#(\w*)}/g, ' id="$1"')
+					.replace(/{.(\w*)}/g, ' class="$1"')
+					//.replace(/{\s}/g, '').replace(/(\w*)~(.*)/g, ' data-$1="$2"');
+		},
+
 		tmpl = function(str, data){
 			if(!str) return;
 
 			var fn, fnBody= "var p = [];with(jsonData){" +
 								"p.push('" + str.replace(/<%=(.*?)%>/g, "',$1,'").replace(/<%(.*?)%>/g, "');$1p.push('") + "');" +
 							"}return p.join('');",
-				regExp = /\W|for|if|else|switch|while|var|length|data|class|id|href|src|title|alt/g;
+				regExp = /\W|for|if|else|switch|case|do|while|var|length|data|class|id|href|src|title|alt/g;
 			
 			if(!/\W/.test(str)){
 				var tpl = tmplCache[str] = (tmplCache[str] || doc.getElementById(str).innerHTML).replace(/[\r\t\n]/g, ''),
@@ -16,11 +22,11 @@
 				fn = tmplCache[key] = tmplCache[key] || tmpl(tpl);
 			} else {
 				var tpl = str.replace(/[\r\t\n]/g, ''),
-					key = tpl.replace(regExp, '');
+					key = tpl.replace(regExp, '');iCat.log(fnBody.replace(/#(\w*?)/g, ' id="$1"'))
 				fn = tmplCache[key] = tmplCache[key] || new Function("jsonData", fnBody);
 			}
 			// iCat.log(tmplCache);	
-			return data? fn(data) : fn;
+			return data? fnHook(fn(data)) : fn;
 		};
 
 	/*
@@ -32,23 +38,19 @@
 	 */
 	function View(template, data){
 		this.fnTemplate = tmpl(template);
-		this.data = data || {};
 
 		if(data){
-			this.init();
+			this._render(data);
 		}
 	}
 	View.prototype = {
-		init: function(){
-			this._render(this.data);
-		},
 
 		_render: function(d, clear){
-			var _self = this,
-				parentNode = doc.querySelector(_self.data.parentSelector || d.parentSelector) || doc.body,
-				itemNodes;
+			var _self = this, itemNodes,
+				parentNode = !d.parentWrap ? doc.body :
+					iCat.isString(d.parentWrap)? doc.querySelector(d.parentWrap) : d.parentWrap;
 
-			var	html = _self.fnTemplate(d),
+			var	html = fnHook(_self.fnTemplate(d)),
 				o = doc.createElement('div');
 			
 			o.innerHTML = html;
@@ -62,36 +64,23 @@
 			}
 
 			while(itemNodes.length>0){
-					parentNode.appendChild(itemNodes[0]);
+				parentNode.appendChild(itemNodes[0]);
 			}
+
 			o = null;
 		},
 
 		addItem: function(d){
-			var _self = this,
-				dataItems = _self.data.data;
-
-			if(iCat.isArray(d)){
-				dataItems.concat(d);
-				_self._render({data:d});
-			} else if(iCat.isObject(d)) {
-				if(d.sucess){
-					dataItems.concat(d.data);
-					_self._render(d);
-				} else {
-					dataItems.push(d);
-					_self._render({data:[d]});
-				}
-			}
+			if(!d.sucess) return;
+			this._render(d);
 		},
 
 		setData: function(d){
-			var _self = this;
-			_self.data = d;
-			_self._render(d, true);
+			if(!d.sucess) return;
+			this._render(d, true);
 		},
 
-		getData: function(p){
+		getData: function(d){
 			return this[p];
 		},
 
