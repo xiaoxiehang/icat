@@ -3,7 +3,7 @@
 	window.onload = function(){
 
 		var temp = '<%for(var i=0; i<data.length; i++){%>\
-				<li <%=data[i].jsHook%> <%=data[i].dataAttr%>>\
+				<li>\
 					<a href="<%=data[i].link%>">\
 						<span class="icon"><img src="<%=data[i].img%>"></span>\
 						<span class="desc">\
@@ -18,12 +18,11 @@
 		data = {
 			sucess:true, msg:'',
 			parentWrap:'#qunit-tests',
-			jsHook:{'li':['.J_todo','#J_testNode'], 'a':'.J_me'},
-			dataHook:{'li-ajaxUrl':'http://www.baidu.com'},
+			dataAttr:'data-ajaxUrl~http://www.gionee.com',
 			data:[
-				{link:'ccc', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ccc', jsHook:'{#J_todo}'},
-				{link:'ddd', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ddd', jsHook:'{.J_test}'},
-				{title:'abc', dataAttr:'{ajaxUrl~http://www.baidu.com, pageNum~1, hasnext~false}'}
+				{link:'ccc', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ccc', jsHook:'#J_todo'},
+				{link:'ddd', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ddd', jsHook:'.J_test'},
+				{title:'abc', dataAttr:'data-ajaxUrl~http://www.baidu.com, pageNum~1, hasnext~false'}
 			]
 		};
 	
@@ -142,6 +141,6 @@
 			    }
 			};
 
-		//var pageView = new iCat.View(tempx, datax);
+		var pageViewx = new iCat.View(tempx, datax);
 	};
 })(ICAT);

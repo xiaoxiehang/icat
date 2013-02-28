@@ -1,13 +1,7 @@
 (function(iCat){
 
 	var doc = document, tmplCache = {},
-
-		fnHook = function(s){
-			return s.replace(/{#(\w*)}/g, ' id="$1"')
-					.replace(/{.(\w*)}/g, ' class="$1"')
-					//.replace(/{\s}/g, '').replace(/(\w*)~(.*)/g, ' data-$1="$2"');
-		},
-
+		apSlice = Array.prototype.slice,
 		tmpl = function(str, data){
 			if(!str) return;
 
@@ -22,11 +16,11 @@
 				fn = tmplCache[key] = tmplCache[key] || tmpl(tpl);
 			} else {
 				var tpl = str.replace(/[\r\t\n]/g, ''),
-					key = tpl.replace(regExp, '');iCat.log(fnBody.replace(/#(\w*?)/g, ' id="$1"'))
+					key = tpl.replace(regExp, '');
 				fn = tmplCache[key] = tmplCache[key] || new Function("jsonData", fnBody);
 			}
 			// iCat.log(tmplCache);	
-			return data? fnHook(fn(data)) : fn;
+			return data? fn(data) : fn;
 		};
 
 	/*
@@ -46,26 +40,57 @@
 	View.prototype = {
 
 		_render: function(d, clear){
-			var _self = this, itemNodes,
+			var _self = this, itemNodes, arrNodes = [],
 				parentNode = !d.parentWrap ? doc.body :
 					iCat.isString(d.parentWrap)? doc.querySelector(d.parentWrap) : d.parentWrap;
 
-			var	html = fnHook(_self.fnTemplate(d)),
+			var	html = _self.fnTemplate(d),
 				o = doc.createElement('div');
 			
 			o.innerHTML = html;
 			itemNodes = o.childNodes;
+			arrNodes = apSlice.call(itemNodes);
 
 			if(clear){
 				var oldNodes = parentNode.childNodes;
-				while(oldNodes.length>0){
+				while(oldNodes.length>0){//dom元素集合特性：增添dom时，集合递减
 					parentNode.removeChild(oldNodes[0]);
 				}
 			}
 
+			if(d.dataAttr){
+				var arrAttr = d.dataAttr.split(',');
+				arrAttr.forEach(function(v){
+					v = v.split('~');
+					parentNode.setAttribute(v[0].replace(/^(\s|data-)?/, 'data-'), v[1]);
+				});
+			}
+
 			while(itemNodes.length>0){
+				if(itemNodes[0].nodeType!=1){
+					arrNodes.removeItem(itemNodes[0]);
+				}
 				parentNode.appendChild(itemNodes[0]);
 			}
+
+			iCat.foreach(arrNodes, function(i,el){
+				var dItem = d.data[i];
+				if(!dItem) return;
+				
+				if(dItem.jsHook){
+					var jsHook = dItem.jsHook.replace(/[#\.]/g, ''),
+						cla = el.className;
+					dItem.jsHook.indexOf('#')>=0? el.id = jsHook :
+						el.className = cla.indexOf(jsHook)>=0? cla : cla+(cla? ' ':'')+jsHook;
+				}
+				if(dItem.dataAttr){
+					var arrAttr = dItem.dataAttr.split(',');
+					arrAttr.forEach(function(v){
+						v = v.split('~');
+						el.setAttribute(v[0].replace(/^(\s|data-)?/, 'data-'), v[1]);
+					});
+				}
+			});
 
 			o = null;
 		},
