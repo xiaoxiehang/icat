@@ -1,13 +1,13 @@
 (function(iCat){
 
 	var doc = document, tmplCache = {},
+		regExp = /\W|for|if|else|switch|case|do|while|var|length|data|class|id|href|src|title|alt/g,
 		tmpl = function(str, data){
 			if(!str) return;
 
 			var fn, fnBody= "var p = [];with(jsonData){" +
 								"p.push('" + str.replace(/<%=(.*?)%>/g, "',$1,'").replace(/<%(.*?)%>/g, "');$1p.push('") + "');" +
-							"}return p.join('');",
-				regExp = /\W|for|if|else|switch|case|do|while|var|length|data|class|id|href|src|title|alt/g;
+							"}return p.join('');";
 			
 			if(!/\W/.test(str)){
 				var tpl = tmplCache[str] = (tmplCache[str] || doc.getElementById(str).innerHTML).replace(/[\r\t\n]/g, ''),
@@ -71,7 +71,7 @@
 
 			if(clear){
 				var oldNodes = parentNode.childNodes;
-				while(oldNodes.length>0){//dom元素集合特性：增添dom时，集合递减
+				while(oldNodes.length>0){
 					parentNode.removeChild(oldNodes[0]);
 				}
 			}
@@ -82,8 +82,6 @@
 					if(/^\d+@/.test(k)){
 						k = k.split('@');
 						if(/\{.*?\}/.test(k[1])){
-							//iCat.log(k[1].split(/\s*\{|\}\s*/).removeItem(""));
-							//iCat.log(k[1].replace(/\{(.*?)\}\s*/, '$1|').split('|'));
 							var s = k[1].replace(/\{(.*?)\}\s*/, '$1|').split('|'),
 								items = apSlice.call(o.querySelectorAll(s[1]));
 							items.forEach(function(item){
@@ -105,8 +103,26 @@
 			while(itemNodes.length>0){
 				parentNode.appendChild(itemNodes[0]);
 			}
-
 			o = null;
+
+			this.getData = function(format){
+				format = format || 'string';
+				var jsonFormat = /json/i.test(format),
+					argus = jsonFormat? {} : '',
+					_getData = function(form){
+						if(!form) return;
+						apSlice.call(form.elements).forEach(function(el){
+							var key = el.getAttribute('name'), value = el.value;
+							if(key){
+								jsonFormat?
+									argus[key] = value : argus += '&' + key + '=' + value;
+							}
+						});
+						return jsonFormat? argus : argus.replace(/^&/, '');
+					};
+				
+				return _getData(/form/i.test(parentNode.tagName)? parentNode : parentNode.querySelector('form'));
+			}
 		},
 
 		addItem: function(d){
@@ -117,13 +133,7 @@
 		setData: function(d){
 			if(!d.sucess) return;
 			this._render(d, true);
-		},
-
-		getData: function(d){
-			return this[p];
-		},
-
-		destroy: function(){}
+		}
 	};
 
 	/*
@@ -152,7 +162,14 @@
 
 	// 对外接口
 	iCat.namespace('View', 'Model', 'Controler');
-	iCat.View = View;
+	iCat.View = function(template, data){
+		var k = template.replace(regExp, '');
+		iCat.View[k] = new View(template, data);
+		iCat.View[k].destroy = function(){
+			iCat.View[k] = null;
+		};
+		return iCat.View[k];
+	};
 	iCat.Model = Model;
 	iCat.Controler = Controler;
 })(ICAT);

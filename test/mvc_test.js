@@ -18,12 +18,12 @@
 		data = {
 			sucess:true, msg:'',
 			parentWrap:'#qunit-tests',
-			/*hooks:{
+			hooks:{
 				'1@li': ['#J_todo', '.J_slide', 'pageNum~1'],
 				'0@li span.desc': '.J_me',//span.desc集合中的第一个
 				'0@{li} span.desc': 'data-ajaxUrl~http://www.gionee.com',//每个item中第一个span.desc
 				'li b': ['data-ajaxUrl~http://www.baidu.com', 'pageNum~1', 'hasnext~false']
-			},*/
+			},
 			data:[
 				{link:'ccc', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ccc'},
 				{link:'ddd', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ddd'},
@@ -31,7 +31,7 @@
 			]
 		};
 	
-		var pageView = new iCat.View(temp, data),//'J_mvcView'
+		var pageView = iCat.View(temp, data),//'J_mvcView'
 			d = {
 				sucess:true, msg:'',
 				parentWrap:'',
@@ -52,20 +52,20 @@
 							<ul>\
 								<li>\
 									<a>\
-										<figure class="clearfix">\
+										<form>\
 											<div class="pic"><img src="<%=data.info.img%>" onerror="this.src=\\\'src/img/ico_default.jpg\\\'"></div>\
 											<div class="desc">\
 												<p>\
-													<span>类型: <%=(data.types[data.info.ptype]||{})[\'title\']%></span>\
+													<span>类型: <input type="text" name="type" value="<%=(data.types[data.info.ptype]||{})[\'title\']%>" /></span>\
 													<span>资费: <%=["免费","道具收费","关卡收费"][parseInt(data.info.pay_type)-1]%></span>\
-													<span>语言: <%=data.info.language%></span>\
-													<span>大小: <%=data.info.size%></span>\
+													<span>语言: <input type="text" name="language" value="<%=data.info.language%>" /></span>\
+													<span>大小: <input type="text" name="size" value="<%=data.info.size%>" /></span>\
 													<span>版本: <%=data.info.version%></span>\
 													<span>更新: <%=data.info.update_time%></span>\
 													<span>公司: <%=data.info.company%></span>\
 												</p>\
 											</div>\
-										</figure>\
+										</form>\
 									</a>\
 								</li>\
 							</ul>\
@@ -89,6 +89,10 @@
 			datax = {
 			    "success": true,
 			    "msg": "",
+			    "hooks": {
+			    	"form": ".J_formTest",
+			    	"span": ".member"
+			    },
 			    "data": {
 			        "info": {
 			            "id": "32",
@@ -146,6 +150,12 @@
 			    }
 			};
 
-		var pageViewx = new iCat.View(tempx, datax);
+		var pageViewx = iCat.View(tempx, datax);
+		pageViewx.destroy();
+		console.log(iCat);//'json'
+
+		document.querySelector('.game-inf input').onchange = function(){
+			console.log(pageViewx.getData('json'));
+		};
 	};
 })(ICAT);
