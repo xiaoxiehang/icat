@@ -18,11 +18,16 @@
 		data = {
 			sucess:true, msg:'',
 			parentWrap:'#qunit-tests',
-			dataAttr:'data-ajaxUrl~http://www.gionee.com',
+			/*hooks:{
+				'1@li': ['#J_todo', '.J_slide', 'pageNum~1'],
+				'0@li span.desc': '.J_me',//span.desc集合中的第一个
+				'0@{li} span.desc': 'data-ajaxUrl~http://www.gionee.com',//每个item中第一个span.desc
+				'li b': ['data-ajaxUrl~http://www.baidu.com', 'pageNum~1', 'hasnext~false']
+			},*/
 			data:[
-				{link:'ccc', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ccc', jsHook:'#J_todo'},
-				{link:'ddd', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ddd', jsHook:'.J_test'},
-				{title:'abc', dataAttr:'data-ajaxUrl~http://www.baidu.com, pageNum~1, hasnext~false'}
+				{link:'ccc', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ccc'},
+				{link:'ddd', img:'http://dev.assets.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'ddd'},
+				{title:'abc'}
 			]
 		};
 	

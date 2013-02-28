@@ -1,7 +1,6 @@
 (function(iCat){
 
 	var doc = document, tmplCache = {},
-		apSlice = Array.prototype.slice,
 		tmpl = function(str, data){
 			if(!str) return;
 
@@ -27,7 +26,7 @@
 	 * view-module职责：
 	 * - 初始化页面刚进入时的模板函数（及数据），渲染模块
 	 * - 接收controler传递过来的数据，并更新渲染模块
-	 * - 获取用户‘输入的数据’或‘模版数据’，传递给controler
+	 * - 获取用户‘输入的表单数据’，传递给controler
 	 * - 销毁自己
 	 */
 	function View(template, data){
@@ -40,16 +39,35 @@
 	View.prototype = {
 
 		_render: function(d, clear){
-			var _self = this, itemNodes, arrNodes = [],
+			var _self = this,
+				apSlice = Array.prototype.slice,
 				parentNode = !d.parentWrap ? doc.body :
-					iCat.isString(d.parentWrap)? doc.querySelector(d.parentWrap) : d.parentWrap;
+					iCat.isString(d.parentWrap)? doc.querySelector(d.parentWrap) : d.parentWrap,
+				itemNodes,
+				joinHook = function(hooks, el){
+					if(!hooks || !el) return;
+
+					hooks = iCat.isArray(hooks)? hooks : [hooks];
+					hooks.forEach(function(v){
+						if(!v) return;
+
+						if(/\w*~.*/.test(v)){
+							v = v.split('~');
+							el.setAttribute(v[0].replace(/^(\s|data-)?/, 'data-'), v[1]);
+						} else {
+							var jsHook = v.replace(/[#\.]/g, ''),
+								cla = el.className;
+							v.indexOf('#')>=0? el.id = jsHook :
+								el.className = cla.indexOf(jsHook)>=0? cla : cla+(cla? ' ':'')+jsHook;
+						}
+					});
+				};
 
 			var	html = _self.fnTemplate(d),
 				o = doc.createElement('div');
 			
 			o.innerHTML = html;
 			itemNodes = o.childNodes;
-			arrNodes = apSlice.call(itemNodes);
 
 			if(clear){
 				var oldNodes = parentNode.childNodes;
@@ -58,39 +76,35 @@
 				}
 			}
 
-			if(d.dataAttr){
-				var arrAttr = d.dataAttr.split(',');
-				arrAttr.forEach(function(v){
-					v = v.split('~');
-					parentNode.setAttribute(v[0].replace(/^(\s|data-)?/, 'data-'), v[1]);
+			if(d.hooks){
+				iCat.foreach(d.hooks, function(k, hooks){
+					k = k.replace(/\D+@/g, '');
+					if(/^\d+@/.test(k)){
+						k = k.split('@');
+						if(/\{.*?\}/.test(k[1])){
+							//iCat.log(k[1].split(/\s*\{|\}\s*/).removeItem(""));
+							//iCat.log(k[1].replace(/\{(.*?)\}\s*/, '$1|').split('|'));
+							var s = k[1].replace(/\{(.*?)\}\s*/, '$1|').split('|'),
+								items = apSlice.call(o.querySelectorAll(s[1]));
+							items.forEach(function(item){
+								joinHook(hooks, item.querySelectorAll(s[0])[k[0]]);
+							});
+						} else {
+							var node = o.querySelectorAll(k[1])[k[0]];
+							joinHook(hooks, node);
+						}
+					} else {
+						var nodes = apSlice.call(o.querySelectorAll(k));
+						nodes.forEach(function(node){
+							joinHook(hooks, node);
+						});
+					}
 				});
 			}
 
 			while(itemNodes.length>0){
-				if(itemNodes[0].nodeType!=1){
-					arrNodes.removeItem(itemNodes[0]);
-				}
 				parentNode.appendChild(itemNodes[0]);
 			}
-
-			iCat.foreach(arrNodes, function(i,el){
-				var dItem = d.data[i];
-				if(!dItem) return;
-				
-				if(dItem.jsHook){
-					var jsHook = dItem.jsHook.replace(/[#\.]/g, ''),
-						cla = el.className;
-					dItem.jsHook.indexOf('#')>=0? el.id = jsHook :
-						el.className = cla.indexOf(jsHook)>=0? cla : cla+(cla? ' ':'')+jsHook;
-				}
-				if(dItem.dataAttr){
-					var arrAttr = dItem.dataAttr.split(',');
-					arrAttr.forEach(function(v){
-						v = v.split('~');
-						el.setAttribute(v[0].replace(/^(\s|data-)?/, 'data-'), v[1]);
-					});
-				}
-			});
 
 			o = null;
 		},
