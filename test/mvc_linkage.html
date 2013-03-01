@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+	<script id="sysRef" type="text/javascript" src="../src/core.js"></script>
+	<script id="sysRef" type="text/javascript" src="../src/event.js"></script>
+	<script type="text/javascript" src="../src/mvc.js"></script>
+	<script type="text/javascript" src="dataArea.js"></script>
+	<script type="text/javascript" src="linkage.js"></script>
+</head>
+<body>
+	<div id="J_linkageWrap" old-anode="140624"></div>
+	<script type="text/icat-template" id="J_selectView">
+		<%var phtml='', chtml='', crhtml='';
+		for(var p in data){
+			var pVal = data[p].val;
+			if(selectNum[0]==pVal){
+				phtml += '<option value="'+p+'|'+pVal+'" title="'+pVal+'" selected>'+p+'</option>';
+				for(var c in data[p].items){
+					var cVal = data[p].items[c].val;
+					if(selectNum[1]==cVal){
+						chtml += '<option value="'+c+'|'+cVal+'" title="'+cVal+'" selected>'+c+'</option>';
+						for(var cr in data[p].items[c].items){
+							var crVal = data[p].items[c].items[cr];
+							crhtml += '<option value="'+cr+'|'+crVal+'" title="'+crVal+'" '+(selectNum[2]==crVal? "selected":"")+'>'+cr+'</option>';
+						}
+					} else {
+						chtml += '<option value="'+c+'|'+cVal+'" title="'+cVal+'">'+c+'</option>';
+					}
+				}
+			} else {
+				phtml += '<option value="'+p+'|'+pVal+'" title="'+pVal+'">'+p+'</option>';
+			}
+		}%>
+		<select name="province"><%=phtml%></select>
+		<select name="city"><%=chtml%></select>
+		<select name="country"><%=crhtml%></select>
+	</script>
+</body>
+</html>

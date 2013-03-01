@@ -39,7 +39,9 @@
 					{link:'000', img:'http://assets.3gtest.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'000', jshook:'doit'}
 				]
 			};//iCat.log(pageView)
-		
+		pageView.setData({sucess:true, data:{}});//考虑到view不单单插入到一个父层中，没有父层则不做任何操作
+		pageView.extend({fn: function(){alert(0)}});
+		//pageView.fn();
 		/*document.body.onclick = function(){
 			pageView.setData(d);iCat.log(pageView)
 			pageView.addItem([{link:'bbb', img:'http://assets.3gtest.gionee.com/apps/game/apk/pic/pic_icon.jpg', title:'bbb', jshook:'testit'}]);
@@ -89,6 +91,7 @@
 			datax = {
 			    "success": true,
 			    "msg": "",
+			    "parentWrap": "body",
 			    "hooks": {
 			    	"form": ".J_formTest",
 			    	"span": ".member"
@@ -151,11 +154,10 @@
 			};
 
 		var pageViewx = iCat.View(tempx, datax);
-		pageViewx.destroy();
-		console.log(iCat);//'json'
+		console.log(pageViewx.getData('json'));
 
-		document.querySelector('.game-inf input').onchange = function(){
-			console.log(pageViewx.getData('json'));
-		};
+		iCat.Event.bindEvent(document.querySelector('.game-inf input'), 'change', function(){
+			console.log(pageViewx.getData());
+		});
 	};
 })(ICAT);

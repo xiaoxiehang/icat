@@ -1,21 +1,26 @@
 (function(iCat){
 
 	var doc = document, tmplCache = {},
-		regExp = /\W|for|if|else|switch|case|do|while|var|length|data|class|id|href|src|title|alt/g,
+		tsKey = function(s){
+			return s.replace(/for|if|else|switch|case|do|while|var|data|length|this/g, '_')
+					.replace(/class|id|href|src|title|alt|type|name|value|on\w*/g, '110')
+					.replace(/\W/g, '').replace(/110/g, '$')
+					.slice(32,64);
+		},
 		tmpl = function(str, data){
 			if(!str) return;
 
-			var fn, fnBody= "var p = [];with(jsonData){" +
-								"p.push('" + str.replace(/<%=(.*?)%>/g, "',$1,'").replace(/<%(.*?)%>/g, "');$1p.push('") + "');" +
-							"}return p.join('');";
+			var fn, fnBody= "var __p_fun = [];with(jsonData){" +
+								"__p_fun.push('" + str.replace(/<%=(.*?)%>/g, "',$1,'").replace(/<%(.*?)%>/g, "');$1__p_fun.push('") + "');" +
+							"}return __p_fun.join('');";
 			
 			if(!/\W/.test(str)){
 				var tpl = tmplCache[str] = (tmplCache[str] || doc.getElementById(str).innerHTML).replace(/[\r\t\n]/g, ''),
-					key = tpl.replace(regExp, '');
+					key = tsKey(tpl);
 				fn = tmplCache[key] = tmplCache[key] || tmpl(tpl);
 			} else {
 				var tpl = str.replace(/[\r\t\n]/g, ''),
-					key = tpl.replace(regExp, '');
+					key = tsKey(tpl);
 				fn = tmplCache[key] = tmplCache[key] || new Function("jsonData", fnBody);
 			}
 			// iCat.log(tmplCache);	
@@ -27,7 +32,7 @@
 	 * - 初始化页面刚进入时的模板函数（及数据），渲染模块
 	 * - 接收controler传递过来的数据，并更新渲染模块
 	 * - 获取用户‘输入的表单数据’，传递给controler
-	 * - 销毁自己
+	 * - 扩展实例化后对象的方法
 	 */
 	function View(template, data){
 		this.fnTemplate = tmpl(template);
@@ -41,12 +46,14 @@
 		_render: function(d, clear){
 			var _self = this,
 				apSlice = Array.prototype.slice,
-				parentNode = !d.parentWrap ? doc.body :
-					iCat.isString(d.parentWrap)? doc.querySelector(d.parentWrap) : d.parentWrap,
+				parentNode = iCat.isString(d.parentWrap)? doc.querySelector(d.parentWrap) : d.parentWrap;
+			if(!parentNode) return;
+
+			var	html = _self.fnTemplate(d),
+				o = doc.createElement('div'),
 				itemNodes,
 				joinHook = function(hooks, el){
 					if(!hooks || !el) return;
-
 					hooks = iCat.isArray(hooks)? hooks : [hooks];
 					hooks.forEach(function(v){
 						if(!v) return;
@@ -62,9 +69,6 @@
 						}
 					});
 				};
-
-			var	html = _self.fnTemplate(d),
-				o = doc.createElement('div');
 			
 			o.innerHTML = html;
 			itemNodes = o.childNodes;
@@ -126,13 +130,15 @@
 		},
 
 		addItem: function(d){
-			if(!d.sucess) return;
 			this._render(d);
 		},
 
 		setData: function(d){
-			if(!d.sucess) return;
 			this._render(d, true);
+		},
+
+		extend: function(o){
+			iCat.mix(this, o);
 		}
 	};
 
@@ -141,35 +147,54 @@
 	 * - 处理controler传递过来的数据，进行封装返回
 	 * - 处理数据层面的业务逻辑，进行封装返回
 	 * - 按需存取数据
-	 * - 销毁自己
+	 * - 扩展实例化后对象的方法
 	 */
-	function Model(argument){
-		// body...
+	function Model(module){
+		this.mID = module;
 	}
-	Model.prototype = {};
+	Model.prototype = {
+		extend: function(o){
+			iCat.mix(this, o);
+		}
+	};
 
 	/*
 	 * controler-module职责：
 	 * - 响应用户动作，调用对应的View和Model
 	 * - 在View/Model之间传递数据
 	 * - 如果是apk，添加或调用硬件接口
-	 * - 销毁自己
+	 * - 扩展实例化后对象的方法
 	 */
-	function Controler(argument){
-		// body...
+	function Controler(module, events){
+		this.controler = iCat.obsCreate(module||'__pageControler');
+		if(events){
+			this.controler.subscribe(events);
+		}
 	}
-	Controler.prototype = {};
+	Controler.prototype = {
+		fn: function(){
+			
+		},
+
+		extend: function(o){
+			iCat.mix(this, o);
+		}
+	};
 
 	// 对外接口
-	iCat.namespace('View', 'Model', 'Controler');
 	iCat.View = function(template, data){
-		var k = template.replace(regExp, '');
+		/*var k = tsKey(template);
 		iCat.View[k] = new View(template, data);
 		iCat.View[k].destroy = function(){
 			iCat.View[k] = null;
 		};
-		return iCat.View[k];
+		return iCat.View[k];*/
+		return new View(template, data);
 	};
-	iCat.Model = Model;
-	iCat.Controler = Controler;
+	iCat.Model = function(module, events){
+		return new Model(module);
+	};
+	iCat.Controler = function(module, events){
+		return new Controler(module, events);
+	};
 })(ICAT);
