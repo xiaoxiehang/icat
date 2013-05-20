@@ -1,290 +1,460 @@
-/** load.js */
-(function(iCat){
-	var doc = document,
-		ohead = doc.head || doc.getElementsByTagName('head')[0],
-		_metaAppRef = doc.getElementsByName('appRef')[0],
-		_curScript, _curUrl, _timestamp,
-		_hasSysOZ, _hasAppOZ, _sysPlugin, _appPlugin,
-		_corelib, _asynCorelib, _mainJS, _asynMainJS,
-		_loadedGroup = {}, _modGroup = {};
-	
-	// get the current js-file
-	(function(scripts){
-		_curScript   =  scripts[scripts.length-1];
-		_curUrl      =  _curScript.hasAttribute ?  _curScript.src : _curScript.getAttribute('src',4);
-		_corelib     =  _curScript.getAttribute('corelib') || '';
-		_asynCorelib =  _curScript.getAttribute('asyn-corelib') || '';
-		_mainJS      =  _curScript.getAttribute('main') || '';
-		_asynMainJS  =  _curScript.getAttribute('asyn-main') || '';
-		_hasSysOZ    =  /\/sys\//i.test(_curUrl);
-		_hasAppOZ    =  /^\.{2}\//.test(_mainJS||_asynMainJS);
-		
-		if(/\?[vt]=\d+/.test(_curUrl)){
-			_timestamp = _curUrl.replace(/.*\?/,'?');
-			_curUrl = _curUrl.replace(/\?.*/,'');
-		}
-	})(doc.getElementsByTagName('script'));
-	
-	// set the path
-	iCat.modsConfig = {};
-	iCat.sysRef = _hasSysOZ? _curUrl.replace(/\/sys\/.*/, '/sys') : _curUrl.replace(/\/\w*\.js/, '');
-	iCat.appRef = _metaAppRef? _metaAppRef.content : iCat.sysRef;
-	iCat.libRef = iCat.sysRef + '/lib';
-	_sysPlugin  = _hasSysOZ? _curUrl.replace(/icat\..*/,'plugin/') : iCat.sysRef+'plugin/';
-	_appPlugin  = iCat.appRef + (_hasAppOZ? '/assets':'') + '/plugin/';
-	
-	// support user's config
-	iCat.config = function(cfg){
-		iCat.modsConfig[cfg.modName] = [];
-		
-		iCat.foreach(cfg.paths, function(k, v){
-			iCat.modsConfig[cfg.modName].push((cfg.baseUrl||'')+v);
-		});
-	}
-	
-	// type1( ): 指向sys根目录(sys级) ~/指向icat下的plugin目录
-	// type2(/): 指向lib根目录(lib级) //库文件夹和库名相同
-	// type3(./): 指向app根目录(app级) ../指向assets下的css或js目录 .~/指向assets下的plugin目录
-	// type4(网址形式): 外链网址
-	var _dealUrl = function(s){
-		if(!s) return;
-		
-		//step1: 清理空格及?|#后缀参数
-		var url = s.replace(/\s|[\?#].*/g,''), type = url.replace(/.*\./g,''),
-			isCSS = type=='css';
-		if(!url) return;
-		
-		//step2: 是否开启debug
-		if(iCat.isDebug){
-			url = /\.source/i.test(url)? url :
-				(isCSS? url.replace(/\.css/g, '.source.css') : url.replace(/\.js/g, '.source.js'));
-		}
-		if(/^(http|ftp|https):\/\/.*/i.test(url)){//type4，直接输出
-			return url;
-		} else {
-			if(/^\.{1,2}(~)?\//.test(url)){//type3 ##千万不能带g了
-				if(/^\.\//.test(url))
-					url = url.replace(/^\./, iCat.appRef);
-				if(/^\.{2}\//.test(url))
-					url = url.replace(/^\.{2}/, iCat.appRef+(isCSS? '/assets/css':'/assets/js'));
-				if(/^\.~\//.test(url))
-					url = url.replace(/^\.~\//, _appPlugin);
-			} else if(/^\/{1,2}/.test(url)){//type2	
-				if(/^\/{2}/.test(url)){
-					var libFolder = url.replace(/^\/{2}|.source|.css|.js/ig, '');
-					libFolder = /\d|\./.test(libFolder)? libFolder.replace(/\d(\/)?|\./g,'') : libFolder;
-					url = url.replace(/^\//, iCat.libRef+'/'+libFolder);
-				} else {
-					url = url.replace(/^\//, iCat.libRef+'/');
-				}
-			} else {//type1
-				if(/^~\//.test(url)){
-					url = url.replace(/^~\//, _sysPlugin);
-				} else {
-					url = iCat.sysRef + '/' + url;
-				}
+/* load.js # */
+(function(iCat, root, doc){
+
+	// 本模块公用方法
+	var _loadedGroup = {}, _modGroup = {}, _fnLoad;
+	iCat.util({
+		getCurrentJS: function(){
+			var scripts = doc.getElementsByTagName('script');
+			return scripts[scripts.length-1];
+		},
+
+		/*
+		 * type1: 参照sys目录
+		 * type2: 参照页面根目录
+		 * type3: 参照main.js目录
+		 * type4: 网址
+		 */
+		_dealURL: function(arr, isSingle){//isSingle表示强制单个加载
+			if(!arr.length) return;
+			if(arr.length===1) isSingle = true;
+
+			var newArr, urlArr = [],
+				_notUrl = function(s){
+					var v = s,
+						isConcat = iCat.PathConfig._isConcat && !isSingle ? '_' : '';
+					if(/^\.{1,}\//.test(v)){//type3
+						v = /^\.\//.test(v) ?
+								v.replace(/^\.\//g, iCat.PathConfig[isConcat+'appRef']) :
+								v.replace(/^\.{2}\//g, iCat.PathConfig[isConcat+'appRef'].replace(/\w+\/$/g,''));
+					}
+					else if(/^\//.test(v)){//type2
+						v = v.replace(/^\//g, iCat.PathConfig.pageRef);
+					} else {//type1
+						v = iCat.PathConfig[isConcat+'sysRef'] + v;
+					}
+
+					return v;
+				};
+			
+			if(iCat.PathConfig._isConcat && !isSingle){
+				newArr = '';
+				iCat.DebugMode ?
+					arr.forEach(function(v){
+						v = v.replace(/\?.*/, '');
+						if(/^(http|ftp|https):\/\//i.test(v))//type4
+							urlArr.push(
+								v.indexOf('!')>=0 ?
+									v.replace(/\!/g,'') :
+									v.replace(/(\.source)?(\.(js|css))/g,'.source$2')
+							);
+						else {
+							if(/^\//.test(v)){
+								v = _notUrl(v);
+								urlArr.push(
+									v.indexOf('!')>=0 ?
+										v.replace(/\!/g,'') :
+										v.replace(/(\.source)?(\.(js|css))/g,'.source$2')
+								);
+							} else {
+								v = _notUrl(v);
+								newArr += (v.indexOf('!')>=0? v.replace(/\!/g,'') : v.replace(/(\.source)?(\.(js|css))/g,'.source$2')) + ',';
+							}
+						}
+					})
+					:
+					arr.forEach(function(v){
+						v = v.replace(/\?.*/, '');
+						v = v.replace(/\!/g,'');
+						if(/^(http|ftp|https):\/\//i.test(v))//type4
+							urlArr.push(v);
+						else {
+							if(/^\//.test(v)){
+								urlArr.push(_notUrl(v));
+							} else {
+								newArr += _notUrl(v) + ',';
+							}
+						}
+					});
+
+				newArr = iCat.PathConfig._webRoot + newArr.replace(/,$/g, '');
+				return [newArr].concat(urlArr);
+			} else {
+				newArr = [];
+				iCat.DebugMode ?
+					arr.forEach(function(v){
+						v = v.replace(/\?.*/, '');
+						if(/^(http|ftp|https):\/\//i.test(v))//type4：网址
+							newArr.push(
+								v.indexOf('!')>=0 ?
+									v.replace(/\!/g,'') :
+									v.replace(/(\.source)?(\.(js|css))/g,'.source$2')
+							);
+						else {
+							v = _notUrl(v);
+							newArr.push(
+								v.indexOf('!')>=0 ?
+									v.replace(/\!/g,'') :
+									v.replace(/(\.source)?(\.(js|css))/g,'.source$2')
+							);
+						}
+					})
+					:
+					arr.forEach(function(v){
+						v = v.replace(/\?.*/, '');
+						v = v.replace(/\!/g,'');
+						if(/^(http|ftp|https):\/\//i.test(v))//type4：网址
+							newArr.push(v);
+						else {
+							newArr.push(_notUrl(v));
+						}
+					});
+
+				return newArr;
 			}
-		}
-		
-		return url + (_timestamp || '');
-	},
-	
-	_blockImport = function(loadFile){
-		var url = loadFile, _url = url.replace(/[\?#].*/, '');
-		if(_loadedGroup[_url]) return;
-		
-		var type = _url.replace(/.*\./g,''),
-			isCSS = type=='css', tag = isCSS? 'link':'script',
-			attr = isCSS? ' type="text/css" rel="stylesheet"' : ' type="text/javascript"',
-			path = (isCSS? 'href':'src') + '="'+url+'"';
-		doc.write('<'+tag+attr+path+(isCSS? '/>':'></'+tag+'>'));
-		_loadedGroup[_url] = true;
-	},
-	
-	// 执行callback函数
-	_exec = function(f, cb, mod, ct){
-		if(cb && iCat.isFunction(cb))
-			cb(ct || iCat);
-		
-		if(mod){
-			_modGroup[mod] = true;
+		},
+
+		_blockImport: function(file){
+			var url = file,
+				_url = url.indexOf('#')>0?
+					url.replace(/(#.*)/, iCat.PathConfig.timestamp+'$1') : (url + iCat.PathConfig.timestamp);
+
+			if(_loadedGroup[_url]) return;
 			
-			iCat.modsConfig[mod] = iCat.modsConfig[mod]? iCat.modsConfig[mod] : [];
-			iCat.modsConfig[mod].push(f);
-		}
-	},
-	
-	_unblockImport = function(file, callback, mod, context){
-		
-		var	url = file,
-		
-			pNode = _curScript.parentNode || ohead,
+			var type = url.replace(/.*\./g,''),
+				isCSS = type=='css', tag = isCSS? 'link':'script',
+				attr = isCSS? ' type="text/css" rel="stylesheet"' : ' type="text/javascript"',
+				path = (isCSS? 'href':'src') + '="'+_url+'"';
+			doc.write('<'+tag+attr+path+(isCSS? '/>':'></'+tag+'>'));
+			_loadedGroup[url] = true;
+		},
+
+		_unblockImport: function(option){
+			//增加时间戳
+			var	_url = option.file.indexOf('#')>0?
+					option.file.replace(/(#.*)/, iCat.PathConfig.timestamp+'$1') : (option.file + iCat.PathConfig.timestamp);
 			
-			//去掉?|#后面的参数，保留纯净的文件
-			_url = url.replace(/[\?#].*/, '');
-		
-		if(_loadedGroup[_url]){
-			_exec(file, callback, mod, context);
-			return;
-		}
-		
-		var node, type = _url.replace(/.*\./g,'');
-		if(type==='css'){
-			node = doc.createElement('link');
-			node.setAttribute('type', 'text/css');
-			node.setAttribute('rel', 'stylesheet');
-			node.setAttribute('href', url);
-		} else if(type==='js'){
-			node = doc.createElement('script');
-			node.setAttribute('type', 'text/javascript');
-			node.setAttribute('src', url);
-			node.setAttribute('async', true);
-		}
-		
-		if(!node) return;
+			if(_loadedGroup[option.file]){
+				if(option.callback && iCat.isFunction(option.callback))
+					option.callback(option.context || iCat);
+				
+				if(option.modName){
+					_modGroup[option.modName] = true;
+				}
+				return;
+			}
 			
-		if(iCat.browser.msie){
-			var timer = setInterval(function(){
-				try{
-					document.documentElement.doScroll('left');//在IE下用能否执行doScroll判断dom是否加载完毕
-				}catch(e){
+			var node, type = option.file.replace(/.*\./g,'');
+			if(type==='css'){
+				node = doc.createElement('link');
+				node.setAttribute('type', 'text/css');
+				node.setAttribute('rel', 'stylesheet');
+				node.setAttribute('href', _url);
+			} else if(type==='js'){
+				node = doc.createElement('script');
+				node.setAttribute('type', 'text/javascript');
+				node.setAttribute('src', _url);
+				node.setAttribute('async', true);
+			}
+			
+			if(!node) return;
+			
+			iCat.util.waitObj(function(k){
+				var pNode = doc.body || doc.getElementsByTagName('body')[0];
+				if(!pNode){
+					iCat.__cache_timers[k] = false;
 					return;
+				}
+
+				iCat.__cache_timers[k] = true;
+				
+				/* 监听加载完成 */
+				if(type==='js'){
+					_fnLoad = SHIM._load || function(MG, LG, option, pNode, node, _icat){
+						node.onload = function(){
+							if(option.callback && _icat.isFunction(option.callback))
+								option.callback(option.context || _icat);
+							
+							if(option.modName){
+								MG[option.modName] = true;
+							}
+							LG[option.file] = true;
+						};
+						pNode.appendChild(node);
+					};
+					_fnLoad(_modGroup, _loadedGroup, option, pNode, node, iCat);
 				}
 				
-				clearInterval(timer);
-				if(type==='js' && node.readyState){
-					node.onreadystatechange = function(){
-						if(node.readyState == "loaded" || node.readyState == "complete") {
-							node.onreadystatechange = null;
-							_exec(file, callback, mod, context);
-							_loadedGroup[_url] = true;
+				/* css不需要监听加载完成*/
+				if(type==='css'){
+					setTimeout(function(){
+						if(option.callback && _icat.isFunction(option.callback))
+							option.callback(option.context || _icat);
+						
+						if(option.modName){
+							_modGroup[option.modName] = true;
 						}
-					};
+					},5);
+					_loadedGroup[option.file] = true;
+					pNode.appendChild(node);
 				}
-				pNode.appendChild(node);
-			},1);
-		} else {
-			if(type==='js'){
-				node.onload = function(){
-					_exec(file, callback, mod, context);
-					_loadedGroup[_url] = true;
-				};
-			}
-			pNode.appendChild(node);
+			});
 		}
+	});
+
+	/*
+	 * pageRef:参照页面路径
+	 * sysRef:参照icat.js所在的sys目录路径
+	 * appRef:参照main.js所在的目录路径
+	 * timestamp:时间戳
+	 */
+	iCat.PathConfig = function(cfg){
+		var _curScript = iCat.util.getCurrentJS(),
+			src = _curScript.src,
+			refSlipt = _curScript.getAttribute('refSlipt') || '';
 		
-		/* css不需要监听加载完成*/
-		if(type==='css'){
-			_exec(file, callback, mod, context);
-			_loadedGroup[_url] = true;
-			pNode.appendChild(node);
+		iCat.PathConfig._isConcat = src.indexOf('??')>=0;
+		if(refSlipt && _curScript.baseURI.indexOf(refSlipt)==-1) refSlipt = false;//fixed bug:分隔符在字符串里不存在时
+
+		if(!iCat.PathConfig.appRef){
+			var baseURI = (iCat.DemoMode && !refSlipt)?//fixed bug:为了匹配类似/index.php的情况
+					_curScript.baseURI+'?' : _curScript.baseURI,
+				strExp = iCat.DemoMode? (refSlipt? '('+refSlipt+'/).*' : '(/)([\\w\\.]+)?\\?.*') : '(//[\\w\\.]+/).*',
+				regExp = new RegExp(strExp, 'g');
+			iCat.PathConfig.pageRef = iCat.PathConfig.pageRef || baseURI.replace(regExp, '$1');
+			iCat.PathConfig.weinreRef = iCat.IPMode? baseURI.replace(/(\d+(\.\d+){3}).*/g, '$1:8080/') : '';
+
+			if(iCat.PathConfig._isConcat){
+				var arrsrc = src.replace(/(\?{2}|\.js(?=\?))/g, '$1|').split('|'),
+					_webRoot = arrsrc[0].replace(/\?+/g,'');
+				iCat.PathConfig._webRoot = arrsrc[0];
+				iCat.PathConfig.timestamp = arrsrc[2] || '';//fixed bug:时间戳没设置时，会有undefined
+
+				arrsrc[1].split(',').forEach(function(v){
+					if(/\/sys\//i.test(v))
+						iCat.PathConfig._sysRef = v.replace(/(\/sys\/).*/ig, '$1');
+					if(/\/apps\//i.test(v))
+						iCat.PathConfig._appRef = v.replace(/(\/)\w+(\.\w+)?\.js/g, '$1');
+				});
+
+				iCat.PathConfig.sysRef = (_webRoot+iCat.PathConfig._sysRef).replace(/([^:])\/{2,}/g,'$1/');//fixed bug:把http://变成了http:/
+				iCat.PathConfig.appRef = (_webRoot+iCat.PathConfig._appRef).replace(/([^:])\/{2,}/g,'$1/');
+			} else {
+				if(cfg===true){//初始化设置pageRef,sysRef
+					iCat.PathConfig.sysRef = /\/sys\//i.test(src)? src.replace(/(\/sys\/).*/ig, '$1') : src.replace(/(\/)\w+(\.\w+)?\.js(.*)?/g, '$1');
+					iCat.PathConfig.timestamp = src.replace(/.*\.js(\?)?/g, '$1');
+				} else {//设置appRef
+					iCat.PathConfig.appRef = src.replace(/(\/)\w+(\.\w+)?\.js(.*)?/g, '$1');
+					if(!iCat.PathConfig.timestamp)
+						iCat.PathConfig.timestamp = src.replace(/.*\.js(\?)?/g, '$1');
+				}
+			}
+		}
+
+		if(iCat.isObject(cfg)){
+			iCat.mix(iCat.PathConfig, cfg);
 		}
 	};
-	
+
+	// The first execution 
+	iCat.PathConfig(true);
+
+	// support user's config
+	iCat.ModsConfig = function(cfg){
+		if(iCat.isArray(cfg)){
+			iCat.foreach(cfg, function(k, v){
+				iCat.ModsConfig[v.modName] = (iCat.ModsConfig[v.modName]||[]).concat(v.paths);
+			});
+		} else {
+			if(cfg.modName && cfg.paths){
+				iCat.ModsConfig[cfg.modName] = (iCat.ModsConfig[cfg.modName]||[]).concat(cfg.paths);
+			} else {
+				iCat.foreach(cfg, function(k, v){
+					iCat.ModsConfig[k] = (iCat.ModsConfig[k]||[]).concat(v);
+				});
+			}
+		}
+	};
+
 	//对外接口
 	iCat.mix(iCat, {
-		
+
 		/* 阻塞式加载文件 */
-		inc: function(f){
-			if(!f) return;
-			f = iCat.isString(f)? [f] : f;
+		inc: function(files){
+			if(!files) return;
+			files = iCat.isString(files)? [files] : files;
 			
-			iCat.foreach(f, function(i, v){
+			iCat.foreach(iCat.util._dealURL(files), function(i, v){
 				if(!v) return;
-				_blockImport(_dealUrl(v));
+				iCat.util._blockImport(v);
 			});
-			
 		},
-		
+
 		/* 加载文件形式：
 		 * - 单个文件，支持字符串或文件数组(length为1)
 		 * - 多个文件，必须是文件数组
+		 * - 参数：options || files, callback, isDepend, isSingle, context
 		 */
-		incfile: function(f, cb, isDepend, pNode, context){//加载一个或多个文件
-			if(!f) return;
-			f = iCat.isString(f)? [f] : f;
-			
-			(function(){
-				if(f.length)
-					var curJS = f.shift();
-				else
-					return;
+		include: function(){//加载一个或多个文件
+			if(!arguments.length) return;
 
-				if(f.length){
-					var fn = arguments.callee;
+			if(arguments.length==1){
+				var opt = arguments[0];
+				if(iCat.isString(opt)) opt = {files:opt};
+				if(!iCat.isObject(opt) || !opt.files) return;
 
-					if(isDepend)//文件间有依赖 顺序加载
-						_unblockImport(curJS, function(){fn(f);}, undefined, context);
-					else {
-						_unblockImport(curJS, undefined, undefined, context);
-						fn(f);
-					}
-				} else {
-					_unblockImport(curJS, cb, undefined, context);
-				}
-			})();
-		},
-		
-		/* 加载文件形式：
-		 * - 单个文件，支持字符串或文件数组(length为1)
-		 * - 多个文件，必须是文件数组
-		 */
-		require: function(m, f, cb, pNode, context){//加载有依赖的模块
-			if(!f) return;
-			f = iCat.isString(f)? [f] : f;
-			
-			if(_modGroup[m]){
-				if(cb) cb(context);
-			} else {
+				opt.files = iCat.isString(opt.files) ?
+								iCat.util._dealURL([opt.files]) : iCat.util._dealURL(opt.files, opt.isSingle);
+				
 				(function(){
-					if(f.length)
-						var curJS = f.shift();
-					else
-						return;
+					if(!opt.files.length) return;
 
-					if(f.length){
-						var fn = arguments.callee;
-						_unblockImport(curJS, function(){fn(f);}, m, context);
+					var curJS = opt.files.shift(),
+						fn = arguments.callee;
+					if(opt.files.length){
+						if(opt.isDepend)//文件间有依赖 顺序加载
+							iCat.util._unblockImport({
+								file: curJS,
+								callback: function(){
+									fn(opt.files);//next
+								},
+								context: opt.context
+							});
+						else {
+							iCat.util._unblockImport({
+								file: curJS,
+								context: opt.context
+							});
+							fn(opt.files);//next
+						}
 					} else {
-						_unblockImport(curJS, cb, m, context);
+						iCat.util._unblockImport({
+							file: curJS,
+							callback: opt.callback,
+							context: opt.context
+						});
 					}
 				})();
+			} else {
+				arguments.callee({
+					files: arguments[0],
+					callback: arguments[1],
+					isDepend: arguments[2],
+					isSingle: arguments[3],
+					context: arguments[4]
+				});
+			}
+		},
+		
+		/* 加载文件形式：
+		 * - 单个文件，支持字符串或文件数组(length为1)
+		 * - 多个文件，必须是文件数组
+		 * - 参数：options || modName, files, callback, isSingle, context
+		 */
+		require: function(){//加载有依赖的模块
+			if(!arguments.length) return;
+
+			if(arguments.length==1){
+				var opt = arguments[0];
+				if(!iCat.isObject(opt) || !(opt.files = opt.files || iCat.ModsConfig[opt.modName])) return;
+
+				opt.files = iCat.isString(opt.files) ?
+								iCat.util._dealURL([opt.files]) : iCat.util._dealURL(opt.files, opt.isSingle);
+			
+				if(_modGroup[opt.modName]){
+					if(opt.callback)
+						opt.callback(opt.context);
+				} else {
+					(function(){
+						if(!opt.files.length) return;
+
+						var curJS = opt.files.shift(),
+							fn = arguments.callee;
+						if(opt.files.length){
+							iCat.util._unblockImport({
+								file: curJS,
+								callback: function(){fn(opt.files);},
+								context: opt.context,
+								modName: opt.modName
+							});
+						} else {
+							iCat.util._unblockImport({
+								file: curJS,
+								callback: opt.callback,
+								context: opt.context,
+								modName: opt.modName
+							});
+						}
+					})();
+				}
+			} else {
+				arguments.callee({
+					modName: arguments[0],
+					files: arguments[1],
+					callback: arguments[2],
+					isSingle: arguments[3],
+					context: arguments[4]
+				});
 			}
 		},
 		
 		//使用已加载后的模块
-		use: function(m, cb, t, context){
-			var i = 0, t = t || 100, timer;
-			
-			if(_modGroup[m]){
-				if(cb) cb(context);
-			} else if(iCat.modsConfig[m]){
-				timer = setInterval(function(){
-					i += 5;
-					if(_modGroup[m]){
-						clearInterval(timer);
-						if(cb) cb(context);
-					} else if(i>=t){
-						clearInterval(timer);
-						iCat.require(m, iCat.modsConfig[m], cb, context);
+		//参数：options || modName, callback, delay, context
+		use: function(opt){
+			if(!arguments.length) return;
+
+			var i = 0, timer;
+			if(arguments.length==1){
+				var opt = arguments[0];
+				if(!iCat.isObject(opt)) return;
+
+				iCat.util.waitObj(function(k, t){
+					if(!_modGroup[opt.modName]){
+						iCat.__cache_timers[k] = false;
+						if(t==50 && iCat.ModsConfig[opt.modName]){
+							iCat.require({
+								modName: opt.modName,
+								files: iCat.ModsConfig[opt.modName],
+								context: opt.context
+							});
+						}
+						return;
 					}
-				},5);
+
+					iCat.__cache_timers[k] = true;
+					if(opt.callback)
+						opt.callback(opt.context);
+				});
+			} else {
+				arguments.callee({
+					modName: arguments[0],
+					callback: arguments[1],
+					delay: arguments[2],
+					context: arguments[3]
+				});
 			}
-			
 		}
 	});
-	
-	/* 加载js库和关键js */
-	if(_corelib){
-		_corelib = _corelib.split(',');
-		iCat.inc(_corelib);
-	}else if(_asynCorelib){
-		_asynCorelib = _asynCorelib.split(',');
-		iCat.incfile(_asynCorelib, undefined, true);
+
+	//默认模块
+	iCat.ModsConfig([
+		{
+			modName: 'zepto_core',
+			paths: ['lib/zepto/src/zepto.js', 'lib/zepto/src/event.js', 'lib/zepto/src/ajax.js', 'lib/zepto/src/fx.js']
+		},{
+			modName: 'app_mvcBase',
+			paths: ['./mvc/template.js', './mvc/initdata.js', './mvc/view.js', './mvc/model.js', './mvc/controller.js']
+		}
+	]);
+
+	iCat.weinreStart = function(){
+		if(!iCat.PathConfig.weinreRef) return;
+		var weinrejs = iCat.PathConfig.weinreRef + 'target/target-script-min.js!' + (location.hash || '');
+		iCat.include(weinrejs);
+	};
+
+	//如果是ip模式，自动调用weinre
+	if(iCat.IPMode){
+		iCat.weinreStart();
 	}
-	
-	if(_mainJS)
-		iCat.inc(_mainJS);
-	else if(_asynMainJS)
-		iCat.incfile(_asynMainJS);
-})(ICAT);
+})(ICAT, this, document);

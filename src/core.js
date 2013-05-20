@@ -1,7 +1,18 @@
-/** core.js */
+/*!
+ * Copyright 2011~2013, ICAT JavaScript Library v1.1.4
+ * https://github.com/valleykid/icat
+ *
+ * Copyright (c) 2013 valleykid
+ * Licensed under the MIT license.
+ *
+ * @Author valleykiddy@gmail.com
+ * @Time 2013-04-20 08:50:00
+ */
+
+/* core.js # */
 (function(){
 	// Create the root object, 'window' in the browser, or 'global' on the server.
-	var root = this, iCat = {};
+	var root = this, doc = document, iCat = { version: '1.1.4' };
 	
 	// Export the ICAT object for **Node.js**
 	if(typeof exports!=='undefined'){
@@ -12,51 +23,13 @@
 	} else {
 		root['ICAT'] = iCat;
 	}
-	
-	var _ua = navigator.userAgent, ObjProto = Object.prototype,
-		toString = ObjProto.toString,
-		ArrProto = Array.prototype,
 
-		// iCat.app() with these members.
-		__APP_MEMBERS = ['namespace'];
+	// Compatible plugin for PC
+	root['SHIM'] = root['SHIM'] || {};
 
-	// expand the built-in Objects' functions.
-	String.prototype.trim = function(){
-		return this.replace(/(^\s*)|(\s*$)/g, '');
-	};
-
-	ArrProto.hasItem = function(item){
-		for(var i=0, self=this, len=self.length; i<len; i++){
-			if(self[i]==item){
-				return true;
-			}
-		}
-		return false;
-	};
-
-	ArrProto.removeItem = function(item){
-		for(var i=0, self=this, len=self.length; i<len; i++){
-			if(self[i]==item){
-				self.splice(i, 1);
-			}
-		}
-		return self;
-	};
-
-	ArrProto.unique = function(){
-		var self = this, hash = {}, r = [];
-		for(var i=0, len=self.length; i<len; i++){
-			if(!hash[self[i]]){
-				r.push(self[i]);
-				hash[self[i]] = true;
-			}
-		}
-		return r;
-	};
-	
 	// Copies all the properties of s to r.
 	// w(hite)l(ist):白名单, ov(erwrite):覆盖
-	iCat.mix = function(r, s, wl, ov){
+	iCat.mix = SHIM.mix || function(r, s, wl, ov){
 		if (!s || !r) return r;
 		if (!ov) ov = true;
 		var i, p, len;
@@ -79,84 +52,69 @@
 		}
 		return r;
 	};
-	
+
+	// expand the built-in Objects' functions.
+	iCat.mix(Array.prototype, {
+		//数组中是否包含指定元素
+		contains: function(item){
+			return this.indexOf(item)==-1? false : true;
+		},
+		//数组去掉指定元素
+		remove: function(item){
+			var self = this;
+			self.forEach(function(v, i){
+				if(v===item){ self.splice(i, 1); }
+			});
+			return self;
+		},
+		//数组去重
+		unique: function(){
+			var self = this, hash = {}, r = [];
+			self.forEach(function(v){
+				if(!hash[v]){
+					r.push(v); hash[v] = true;
+				}
+			});
+			return r;
+		}
+	});
+
+	/*-------------------------------------------*
+	 * The core of ICAT's framework
+	 *-------------------------------------------*/
+	var _href = location.href;
+
+	// Kinds of modes or judgments
+	['Function', 'String', 'Object', 'Array', 'Number', 'Boolean', 'Undefined', 'Null'].forEach(function(v){
+		iCat['is'+v] = function(obj){
+			return Object.prototype.toString.call(obj) === '[object '+v+']';
+		};
+	});
+
 	iCat.mix(iCat, {
-		// Current version.
-		version: '1.1.3',
-		
-		// debug or not
-		isDebug: /debug/i.test(root.location.href),
-		
-		// kinds of browsers
-		browser: {
-			safari: /webkit/i.test(_ua),
-			opera: /opera/i.test(_ua),
-			msie: /msie/i.test(_ua) && !/opera/i.test(_ua),
-			mozilla: /mozilla/i.test(_ua) && !/(compatible|webkit)/i.test(_ua)
-		},
-		
-		// Commonly used judgment
-		isFunction: function(obj){
-			return toString.call(obj) == '[object Function]';
-		},
-		
-		isString: function(obj){
-			return toString.call(obj) == '[object String]';
-		},
-		
-		isArray: Array.isArray ||
-			function(obj){
-				return toString.call(obj) == '[object Array]';
-			},
-		
-		isObject: function(obj){
-			return toString.call(obj) == '[object Object]';//obj === Object(obj);
-		},
-		
-		isNull: function(obj){
-			return obj === null;
-		},
+
+		DebugMode: /debug/i.test(_href),
+		DemoMode: /localhost|demo\.|\/{2}\d+(\.\d+){3}|file:/i.test(_href),
+		TestMode: /3gtest\./i.test(_href),
+		IPMode: /\/{2}\d+(\.\d+){3}/.test(_href),
 
 		isEmptyObject: function(obj){
-			for(var name in obj){
-				return false;
-			}
+			for(var name in obj){ return false; }
 			return true;
 		},
 
-		// function throttle
-		throttle: function(opt){
-			var timer = null, t_start;
+		isjQueryObject: function(obj){
+			return typeof $!=='undefined' && obj instanceof $;
+		},
 
-			var fn = opt.fn,
-				context = opt.context,
-				delay = opt.delay || 100,
-				mustRunDelay = opt.mustRunDelay;
-			
-			return function(){
-				var args = arguments, t_curr = +new Date();
-				context = context || this;
-				
-				clearTimeout(timer);
-				if(!t_start){
-					t_start = t_curr;
-				}
-				if(mustRunDelay && t_curr - t_start >= mustRunDelay){
-					fn.apply(context, args);
-					t_start = t_curr;
-				}
-				else {
-					timer = setTimeout(function(){
-						fn.apply(context, args);
-					}, delay);
-				}
-			};
+		toArray: SHIM.toArray || function(o){
+			return Array.prototype.slice.call(o);
 		},
 		
 		// Handles objects with the built-in 'foreach', arrays, and raw objects.
 		foreach: function(o, cb, args){
 			var name, i = 0, length = o.length,
-				isObj = length===undefined || iCat.isString(o);
+				isObj = length===undefined || iCat.isString(o) || iCat.isFunction(o);
 			
 			if(args){
 				if(isObj){
@@ -193,40 +151,25 @@
 		Class: function(){
 			var argus = arguments,
 				len = argus.length;
-			
-			if(len==0) return null;
-			
-			else if(len==1){
-				var cfg = argus[0];
-				if(!iCat.isObject(cfg))
-					return null;
-				else {
-					function Cla(){cfg.Create.apply(this, arguments);}
-					iCat.foreach(cfg, function(k, v){
-						if(k!='Create')
-							Cla.prototype[k] = v;
-					});
-					
-					return Cla;
-				}
-			}
-			
-			else if(len>=2){
-				var claName = argus[0],
-					cfg = argus[1],
-					context = argus[2] || root;
-				
-				if(!iCat.isString(claName) || !iCat.isObject(cfg))
-					return null;
-				else {
-					function Cla(){cfg.Create.apply(this, arguments);}
-					iCat.foreach(cfg, function(k, v){
-						if(k!='Create')
-							Cla.prototype[k] = v;
-					});
-					
-					context[claName] = Cla;
-				}
+			if(!len) return;
+
+			if(len===1){
+				if(!iCat.isObject(argus[0])) return;
+				var cfg = argus[0],
+					Cla = function(){cfg.Create.apply(this, arguments);}
+				iCat.foreach(cfg, function(k, v){
+					if(k!='Create') Cla.prototype[k] = v;
+				});
+				return Cla;
+			} else {
+				if(!iCat.isString(argus[0]) && !iCat.isObject(argus[1])) return;
+				var claName = argus[0], cfg = argus[1],
+					context = argus[2] || root,
+					Cla = function(){cfg.Create.apply(this, arguments);};
+				iCat.foreach(cfg, function(k, v){
+					if(k!='Create') Cla.prototype[k] = v;
+				});
+				return context[claName] = Cla;
 			}
 		},
 		
@@ -235,39 +178,50 @@
 		},
 
 		util: function(name, fn){
-			iCat.util[name] = fn;
+			if(iCat.isString(name)){
+				iCat.util[name] = fn;
+			} else {
+				iCat.mix(iCat.util, name);
+			}
 		},
-		
+
 		// iCat或app下的namespace，相当于扩展出的对象
 		namespace: function(){
 			var a = arguments, l = a.length, o = null, i, j, p;
 
-			for (i=0; i<l; ++i){
+			for(i=0; i<l; ++i){
 				p = ('' + a[i]).split('.');
 				o = this;
-				for (j = (root[p[0]]===o)? 1:0; j<p.length; ++j){
+				for(j = (root[p[0]]===o)? 1:0; j<p.length; ++j){
 					o = o[p[j]] = o[p[j]] || {};
 				}
 			}
 			return o;
-		 },
+		},
 		
 		// create a app for some project
 		app: function(name, sx){
-			var self = this,
-				isStr = self.isString(name),
+			var isStr = iCat.isString(name),
 				O = isStr? root[name] || {} : name;
 
-				self.mix(O, self, __APP_MEMBERS, true);
-				self.mix(O, self.isFunction(sx) ? sx() : sx);
-				isStr && (root[name] = O);
+			iCat.mix(O, iCat, ['namespace'], true);
+			iCat.mix(O, iCat.isFunction(sx) ? sx() : sx);
+			isStr && (iCat.app[name] = root[name] = O);
 
-				return O;
-		 },
-		
-		// print some msg for unit testing
-		log: function(msg) {
-			root.console!==undefined && console.log ? console.log(msg) : alert(msg);
-		 }
+			return O;
+		},
+
+		log: function(msg){
+			if(doc.all){
+				root.console!==undefined && console.log? console.log(msg) : alert(msg);
+			} else {
+				try{ __$abc_ICAT(); }
+				catch(e){
+					var fileline = e.stack.split('\n')[2];
+					fileline = fileline.replace(/.*[\(\s]|\).*/g, '').replace(/(.*):(\d+):\d+/g, '$1  line $2:\n');
+					console.log(fileline, msg);
+				}
+			}
+		}
 	});
 }).call(this);
