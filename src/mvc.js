@@ -1,623 +1,559 @@
 /* mvc.js # */
 (function(iCat, root, doc){
+	/*
+	 * view-module职责：ui中心
+	 * - 设置与ui相关的参数
+	 * - 设置与ui相关的函数(events挂钩)，调用其model的逻辑
+	 * - 每次extend都会生成一个新的view-Class
+	 */
+	var View = function(viewId, option){
+		this.viewId = viewId;//必须
+		this._init(option, viewId);
 
-	/* 本模块公用方法 */
-	iCat.util({
-		lazyLoad: function(pNode, t){
-			if(!pNode) return;
-			pNode = iCat.util.queryOne(pNode);
-			var imgs = iCat.toArray(
-				iCat.util.queryAll('img[src$="blank.gif"]', pNode)
-			);
+		if(!iCat.View[viewId]){//copy
+			iCat.View[viewId] = this;
+		} else {
+			return iCat.View[viewId];
+		}
+	};
+	View.prototype = {
+		_init: function(opt, vid){
+			var self = this, IMData;
+
+			if(!iCat.Model[vid]){//data
+				IMData = iCat.Model.__pageData[vid] = {};
+				IMData.ownData = {};
+			}
+
+			iCat.foreach(opt, function(k, v){
+				if(iCat.isFunction(v)){//option中的方法
+					self[k] = v;
+				}
+				else if(k=='config'){//option中的配置数据
+					IMData['config'] = v;
+					IMData['config'].viewId = vid;
+				}
+				else {//option中的静态数据
+					self[k] = v;
+					IMData.ownData[k] = v;
+				}
+			});
+
+			if(self.model)
+				self._htmlRender();
+		},
+
+		_render: function(data, before, clear){
+			var self = this, vid = self.viewId,
+				IMData = iCat.Model.__pageData[vid],
+				curCfg = IMData.config,
+				curWrap = iCat.util.queryOne(curCfg.wrap || curCfg.scrollWrap, iCat.el_curWrap);
 			
-			t = t || 500;
-			setTimeout(function(){
-				imgs.forEach(function(o){
-					var src = o.getAttribute('data-src');
-					iCat.__cache_images = iCat.__cache_images || {};
-					if(!src) return;
-
-					if(!iCat.__cache_images[src]){
-						var oImg = new Image(); oImg.src = src;
-						oImg.onload = function(){
-							o.src = src;
-							iCat.__cache_images[src] = true;
-							oImg = null;
-						};
-					} else {
-						o.src = src;
-					}
-					o.removeAttribute('data-src');
-				});
-			}, t);
-		},
-
-		//根据tempId获得模板函数
-		_fnTmpl: function(tempId){
-			tempId = iCat.isString(tempId)? tempId.trim() : tempId;
-
-			var cacheTmpls = iCat.__cache_tmpls = iCat.__cache_tmpls || {};
-			var cacheFuns = iCat.__cache_funs = iCat.__cache_funs || {};
-			var _fn, sTmpl;
-
-			// cacheTmpls的解析
-			if(iCat.isEmptyObject(cacheTmpls)){
-				iCat.foreach(iCat.app, function(k, v){
-					if(this.template){
-						iCat.foreach(this.template, function(k, v){
-							cacheTmpls[k] = v.replace(/[\r\t\n]/g, '');
-						});
-					}
-				});
-			}
-
-			// tempId的解析
-			if(cacheFuns[tempId]){// 已有模板函数
-				_fn = cacheFuns[tempId];
-			} else if(cacheTmpls[tempId]) {// 已有模板字符串
-				_fn = iCat.util._tmpl( tempId, undefined, cacheTmpls[tempId] );
-				cacheFuns[tempId] = _fn;
-			} else if(iCat.isjQueryObject(tempId)){// jquery对象
-				_fn = iCat.util._tmpl( tempId, undefined, tempId.html() );
-				cacheFuns[tempId] = _fn;
-			} else if(iCat.isString(tempId) || iCat.isObject(tempId)){// dom/选择器/id
-				var el = iCat.isObject(tempId)?
-						tempId : /[\.#]/.test(tempId)?
-							iCat.util.queryOne(tempId) : doc.getElementById(tempId);
-				_fn = iCat.util._tmpl(
-					tempId, undefined, el? el.innerHTML : ''
-				);
-				cacheFuns[tempId] = _fn;
-				cacheTmpls[tempId] = sTmpl;
-			}
-
-			return _fn;
-		},
-
-		_tmpl: function(tempId, data, strTmpl){
-			if(!tempId) return;
-
-			var cacheFuns = iCat.__cache_funs = iCat.__cache_funs || {},
-				fnEmpty = function(){return '';},
-				fBody;
-			if(cacheFuns[tempId]){
-				return data? cacheFuns[tempId](data) : cacheFuns[tempId];
-			} else {
-				if(!strTmpl) return fnEmpty;
-				strTmpl = strTmpl.replace(/[\r\t\n]/g, '');
-				fBody = "var __p_fun = [];with(jsonData){" +
-							"__p_fun.push('" + strTmpl.replace(/<%=(.*?)%>/g, "',$1,'").replace(/<%(.*?)%>/g, "');$1__p_fun.push('") + "');" +
-						"};return __p_fun.join('');";
-				
-				cacheFuns[tempId] = new Function("jsonData", fBody);
-				return data? cacheFuns[tempId](data) : cacheFuns[tempId];
-			}
-		},
-
-		/*
-		 * hooks = '.xxx#aaa.yyy.zzz' | ['.aaa.bbb#ccc', 'data-ajaxUrl~http://www.baidu.com']
-		 */
-		_joinHook: function(hooks, el){
-			if(!hooks || !el) return;
-			hooks = iCat.isArray(hooks)? hooks : [hooks];
-			hooks.forEach(function(v){
-				if(!v) return;
-
-				if(/\w*~.*/.test(v)){
-					v = v.split('~');
-					el.setAttribute(v[0]/*.replace(/^(\s|data-)?/, 'data-')*/, v[1]);
-				} else {
-					if(!/[#\.]/.test(v)) return;
-					v = v.replace(/\s+/g, '')
-						 .replace(/#(\w+)/g, ',$1,').replace(/,+/g, ',')
-						 .replace(/^,|,$/g, '')
-						 .split(',');
-
-					var oldClass = (el.className || '').trim().split(/\s+/);
-					v.forEach(function(s){
-						if(s.indexOf('.')==-1){
-							el.id = s;
-						} else {
-							el.className = s.split('.').concat(oldClass).unique().join(' ').trim();
-						}
+			if(self.model._dataChange(vid, data) ||//数据发生变化
+				iCat.singleWrap ||//单层切换
+					!iCat.util.queryAll('*[data-unclass='+self.viewId+'-loaded]', curWrap).length){//对应子元素为空(fixed bug: 同init函数不同hash无法渲染)
+				if(data.Drepeat){
+					data.Drepeat.forEach(function(d, i){
+						iCat.util.render(curCfg, d, before, i==0);
 					});
+				} else {
+					var ret = iCat.util.render(curCfg, data, before, clear);
+					if(ret && iCat.isFunction(ret)){
+						self.getFormData = ret;
+					}
+				}
+			}
+		},
+
+		_htmlRender: function(data, before, clear){
+			var self = this,
+				IMData = iCat.Model.__pageData[self.viewId],
+				cfg = IMData.config;
+
+			if(!data && self.model){
+				self.model.fetch(cfg, function(servData){
+					self._render(servData, before, clear);
+				});
+			} else if(data) {
+				self._render(data, before, clear);
+			}
+
+			if(self.init)//自定义初始化
+				self.init(self, self.model);
+		},
+
+		setModel: function(m, before, clear){
+			var self = this;
+			if(!m || (iCat.isObject(m) && m.constructor.__super__!==Model))
+				m = iCat.Model['__page_emptyModel'] || new Model('__page_emptyModel');
+			if(!self.model){
+				self.model = m;
+				self._htmlRender(null, before, clear);
+			} else {
+				self.model = m;
+			}
+		},
+
+		setConfig: function(cfg, before, clear){
+			var self = this;
+			if(self.model._cfgChange(self.viewId, cfg)){
+				self._htmlRender(null, before, clear);
+			}
+		},
+
+		setAjaxUrl: function(url, before, clear){ this.setConfig({ajaxUrl:url}, before, clear); },
+		setTempId: function(tid, before, clear){ this.setConfig({tempId:tid}, before, clear); },
+		setWrap: function(wrap, before, clear){ this.setConfig({wrap:wrap}, before, clear); },
+		setData: function(data, before, clear){ this._htmlRender(data, before, clear); },
+		update: function(before){ this._htmlRender(null, before, true); }
+	};
+
+	/*
+	 * model-module职责：数据和逻辑处理中心
+	 * - 设置与数据/逻辑处理相关的函数
+	 * - 处理view发过来的指令，处理后返回相应结果
+	 * - 每次extend都会生成一个新的model-Class
+	 */
+	var Model = function(modelId){
+		this.modelId = modelId;//必须
+
+		if(!iCat.Model[modelId]){//copy
+			iCat.Model[modelId] = this;
+		} else {
+			return iCat.Model[modelId];
+		}
+	};
+	Model.prototype = {
+		_cfgChange: function(vid, cfg){
+			return iCat.Model.cfgChange(vid, cfg);
+		},
+		_dataChange: function(vid, data){
+			return iCat.Model.dataChange(vid, data);
+		},
+
+		fetch: function(){
+			iCat.util.fetch.apply(this, arguments);
+		},
+		save: function(){
+			iCat.util.save.apply(this, arguments);
+		},
+		remove: function(){
+			iCat.util.remove.apply(this, arguments);
+		}
+	};
+
+	/*
+	 * controller-module职责：响应中心
+	 * - 响应用户动作，调用对应的View处理函数
+	 * - 每次extend都会生成一个新的controller-Class
+	 */
+	var Event = iCat.Event,
+		Controller = function(ctrlId, option){
+			option = option || {};
+
+			var self = this;
+			self.ctrlId = ctrlId;//必须
+			self.config = option.config || {};
+			self.routes = option.routes || {};
+
+			self.vmGroups = {};// key=viewId, value=modelId
+			self.wraps = [];// value=modHash
+			self.selectors = [];
+
+			self._init(ctrlId, option, self.config);
+		};
+	Controller.prototype = {
+		_init: function(cId, opt, cfg){
+			var self = this;
+
+			if(!iCat.Controller[cId])//copy
+				iCat.Controller[cId] = self;
+
+			//处理routes
+			iCat.foreach(self.routes, function(k, v){
+				var _k = k.replace(/\s+/g, '')
+					 .replace(/\:num/gi, '(\\d+)')
+					 .replace(/\:\w+/g, '(\\w+)');
+				self.routes[_k] = iCat.isFunction(v)? v : self[v];
+				if(_k!==k) delete self.routes[k];
+			});
+			
+			//把option合并到self
+			iCat.mix(self, opt, 'config, routes');
+
+			//全局调整结构
+			if(cfg.adjustLayout){
+				if(iCat.isString(cfg.adjustLayout) && cfg.baseWrap){
+					var wraps = iCat.toArray(
+						iCat.util.queryAll(cfg.baseWrap)
+					);
+					wraps.forEach(function(w){
+						iCat.util.makeHtml(cfg.adjustLayout, w);
+					});
+				}
+				else {
+					iCat.util.makeHtml(cfg.adjustLayout);
+				}
+			}
+
+			//页面里没有id(值为"")，则为锚点hash
+			if(!iCat.el_bodyWrap.id){
+				root['onhashchange'] = function(){
+					var hash = iCat.util.dealHash(location.hash, self.routes);
+					self.hashArgus = hash;
+					try{ self.routes[hash[0]].call(self); } catch(e){}
+				};
+			}
+
+			var hash = iCat.util.dealHash(
+					iCat.el_bodyWrap.id || location.hash, self.routes
+				);
+			self.hashArgus = hash;
+			try{ self.routes[hash[0]].call(self); } catch(e){}
+		},
+
+		init: function(o){
+			var self = this,
+				cfg = self.config,
+				argus = self.hashArgus,
+				curWrap, curPid = argus[0],
+				curCla = cfg.currentCla || 'icat-current-wrap',
+				page1, page2;
+
+			// clear
+			self.modsLoad_mode = false;
+			if(iCat.el_curWrap){
+				iCat.util.addClass(iCat.el_curWrap, '__prev_page');
+				iCat.util.removeClass(iCat.el_curWrap, curCla);
+				iCat.el_curWrap = null;
+			}
+			if(self.routes.scrollWrap){
+				delete self.routes.scrollWrap;
+			}
+			if(o.setAjax){
+				iCat.rentAjax(o.setAjax[0], o.setAjax[1]);
+			} else {
+				delete iCat.util.ajax;
+			}
+
+			// get informs
+			if(o.baseWrap){
+				curWrap = iCat.el_curWrap = iCat.util.queryOne(o.baseWrap);
+				iCat.util.addClass(curWrap, curCla);
+				delete o.baseWrap;
+			}
+			else if(cfg.baseWrap){
+				var wraps = iCat.util.queryAll(cfg.baseWrap);
+				if(wraps.length && !self.wraps.contains(curPid)){
+					curWrap = iCat.el_curWrap = wraps[self.wraps.length];
+					self.wraps.push(curPid);
+				} else {
+					curWrap = iCat.el_curWrap = wraps[self.wraps.indexOf(curPid)];
+				}
+				iCat.util.addClass(curWrap, curCla);
+			}
+			
+			if(!iCat.el_curWrap) {
+				curWrap = iCat.util.queryOne(o.singleWrap || cfg.singleWrap) || doc.getElementById('J_agentBaseWrap');
+				if(!curWrap){
+					var w = doc.createElement('div');
+					w.id = 'J_agentBaseWrap';
+					iCat.el_bodyWrap.insertBefore(w, iCat.el_bodyWrap.firstChild);
+					iCat.el_curWrap = curWrap = doc.getElementById('J_agentBaseWrap');
+				} else {
+					iCat.el_curWrap = curWrap;
+				}
+				iCat.singleWrap = true;
+			}
+
+			page1 = iCat.util.queryOne('.__prev_page');
+			page2 = iCat.el_curWrap;
+			if(o.switchPage){
+				o.switchPage(page1, page2);
+				if(page1) iCat.util.removeClass(page1, '__prev_page');
+			}
+
+			if(o.adjustLayout){
+				iCat.util.makeHtml(o.adjustLayout, curWrap, iCat.singleWrap);
+				delete o.adjustLayout;
+			}
+
+			if(o.modules){
+				self.pageMods = o.modules.split(/\s*,\s*/);
+				self.modsLoad_mode = !!self.pageMods.length;
+				delete o.modules;
+			}
+
+			// page render
+			self.vmClear();
+			self.vmAdd(o, true);
+			self.modsLoad_mode? self._modsLoad() : self._commLoad();
+		},
+
+		// type: 0=common, 1=height-load, 2=scroll-load
+		_serialize: function(type, mh, wh){
+			if(!this.pageMods.length || !this.pageMods[0]) return;
+
+			var self = this,
+				fn = arguments.callee, vid = self.pageMods[0],
+				curView = iCat.View[vid], modelId = self.vmGroups[vid],
+				IMData = iCat.Model.__pageData[vid],
+				cfg;
+			if(!curView || !IMData){// fixed bug:某个模块请求失败，影响后续加载
+				self.pageMods.shift();
+				fn.apply(self, arguments);
+				return;
+			}
+
+			cfg = IMData.config;
+			switch(type){
+				case 0:
+					cfg.loadCallback = function(node){
+						self.pageMods.shift();
+						if(node) iCat.util.unwrap(node);
+						fn.call(self, 0);
+					};
+					curView.setModel(iCat.Model[modelId]);
+				break;
+
+				case 1:
+					cfg.loadCallback = function(node){
+						self.pageMods.shift();
+						if(node){
+							mh = mh + iCat.util.outerHeight(node);
+							iCat.util.unwrap(node);
+						}
+						if(mh<=wh+20 && self.pageMods.length){
+							fn.call(self, 1, mh, wh);
+						} else if(self.pageMods.length){
+							iCat.util.scroll(
+								self.routes.scrollWrap,
+								function(slHeight, slTop, spHeight){
+									if(!self.pageMods.length) return;
+									if(slTop+spHeight+50>=slHeight){
+										fn.call(self, 2);
+									}
+								}
+							);
+						}
+					};
+					curView.setModel(iCat.Model[modelId]);
+				break;
+
+				case 2:
+					if(curView.loaded==undefined){//拒绝重复
+						curView.loaded = false;
+						cfg.loadCallback = function(node, blankHtml){
+							self.pageMods.shift();
+							curView.loaded = true;
+							if(node) iCat.util.unwrap(node);
+							if(blankHtml) fn.call(self, 2);
+						};
+						curView.setModel(iCat.Model[modelId]);
+					}
+				break;
+			}
+		},
+
+		_modsLoad: function(){// 模块化加载
+			var self = this;
+
+			// 初始化页面
+			if(self.routes.scrollWrap){// 滚动加载
+				var winHeight = iCat.util.outerHeight(root),
+					modsHeight = 0;
+				self._serialize(1, modsHeight, winHeight);
+			} else {
+				if(self.pageMods.length){
+					self._serialize(0);
+				}
+			}
+		},
+
+		_commLoad: function(){// 普通加载
+			var self = this;
+			iCat.foreach(self.vmGroups, function(vid, mid){
+				curView = iCat.View[vid], curModel = iCat.Model[mid];
+				curView.setModel(curModel);
+			});
+		},
+
+		_subscribe: function(events){//events参数同Event.delegate
+			var self = this;
+			iCat.util.recurse(events, function(o){
+				Event.delegate(o, true);
+				if(!self.selectors.contains(o.selector)){
+					self.selectors.push(o.selector);
+					Event.__event_selectors.push(o.selector);
 				}
 			});
 		},
 
-		/*
-		 * & : 本父层
-		 * &>2(:*) : 第三层<所有子元素>
-		 * &>1:.item : 第二层<.item子元素>
-		 * &>1:3 : 第二层<子元素>的第四个元素
-		 * &<0 : 第一层<父元素>
-		 */
-		_getWalker: function(s){
-			if(!/^&[<>]\d+/.test(s)) return;
-			return s.indexOf('>')!=-1?
-				{'c': s.replace(/^&>(\d+\:?[\d\w\.\*#]*).*/, '$1').split(':')} : {'p': s.replace(/^&<(\d+).*/, '$1')};
-		},
-
-		/*
-		 * o = {'c': ['0','1']}
-		 * o = {'c': ['1', '*']} = {'c': ['1']}
-		 * o = {'p': '1'}
-		 */
-		_walker: function(o, ref){
-			if(o.c){
-				var a = parseInt(o.c[0]), b = o.c[1] || '*',
-					isSelector = /[#\.\*]/.test(b),
-					filter = null;
-				b = isSelector? b : parseInt(b);
-				ref = ref[0];//指向创建的div
-				if(!ref) return;
-
-				if(a==0){
-					return isSelector? iCat.toArray(ref.children).filter(function(v){
-						return iCat.util.matches(v, b);
-					}) : ref.children[b];
-				} else {
-					var walker = doc.createTreeWalker(ref, NodeFilter.SHOW_ELEMENT, filter, false),
-						cp, cnodes;
-					for(var i=0; i<a; i++){
-						if(i==a-1){
-							cp = walker.nextNode();
-						} else {
-							walker.nextNode();
-						}
-					}
-					if(isSelector){
-						cnodes = [];
-						while(cp){
-							iCat.foreach(cp.children, function(i, v){
-								if(iCat.util.matches(v, b)){
-									cnodes.push(v);
-								}
-							});
-							cp = walker.nextSibling();
-						}
-					} else {
-						cnodes = cp.children;
-					}
-					return isSelector? cnodes : cnodes[b];
-				}
-
-				
-			} else {
-				var num = parseInt(o.p) + 1;
-				return function(){
-					var px = ref[1];//指向父层
-					if(!px) return;
-
-					for(var i=0; i<num; i++){
-						px = px.parentNode;
-						if(px===doc.body) break;
-					}
-					return px;
-				}();
-			}
-		},
-
-		/*
-		 * tempId可以是字符串，jquery对象/dom对象
-		 * clear表示是否先清空再渲染
-		 */
-		render: function(tempId, data, clear){
-			if(iCat.isString(tempId))
-				tempId = tempId.trim();
-
-			if(data){
-				var parentNode = data.ICwrap,
-					html = iCat.util._fnTmpl(tempId)(data),
-					o = doc.createElement('div'),
-					itemNodes;
-				
-				o.innerHTML = html;
-				if(data.IChooks){//js钩子
-					iCat.foreach(data.IChooks, function(k, arrHook){
-						k = iCat.util._getWalker(k);
-						if(!k) iCat.util._joinHook(arrHook, parentNode);
-						else {
-							var nodes = iCat.util._walker(k, [o, parentNode]);
-							if(!nodes) return;
-							nodes.length===undefined?
-								iCat.util._joinHook(arrHook, nodes) : 
-								nodes.forEach(function(node){
-									iCat.util._joinHook(arrHook, node);
-								});
-						}
-					});
-				}
-				html = o.innerHTML;
-			} else {
-				// 如果没有数据，返回模板函数
-				return iCat.util._fnTmpl(tempId);
-			}
-
-			// 如果没有父层，返回html字符串
-			if(!parentNode) return html;
-			
-			if(clear){//辞旧
-				var oldNodes = parentNode.childNodes;
-				while(oldNodes.length>0){
-					parentNode.removeChild(oldNodes[0]);
-				}
-			}
-
-			itemNodes = o.childNodes;
-			while(itemNodes.length>0){//迎新
-				parentNode.appendChild(itemNodes[0]);
-			}
-
-			// 图片默认惰性加载
-			iCat.util.lazyLoad(parentNode);
-			o = null;
-
-			// 回调函数
-			if(data.callback)
-				data.callback(parentNode);
-		},
-
-		/*
-		 * 一个参数时表示取数据(同规则：storage, cookie)
-		 * 两个及以上的参数时表示存数据
-		 */
-		storage: function(){
-			if(!arguments.length || !window.localStorage || !window.sessionStorage) return;
-			
-			var ls = window.localStorage,
-				ss = window.sessionStorage;
-			if(arguments.length==1){
-				var dname = arguments[0];
-				return iCat.isString(dname)? ( ls.getItem(dname) || ss.getItem(dname) ) : '';
-			} else {
-				var dname = arguments[0],
-					data  = arguments[1],
-					shorttime = arguments[2];
-				if(iCat.isString(dname)){
-					var s = shorttime? ss : ls;
-					s.removeItem(dname);
-					s.setItem(dname, iCat.isObject(data)? JSON.stringify(data) : data);
-				}
-			}
-		},
-
-		clearStorage: function(dname){
-			if(!dname || !window.localStorage || !window.sessionStorage) return;
-
-			var ls = window.localStorage,
-				ss = window.sessionStorage;
-			if(dname==ls || dname==ss){
-				dname.clear();
-			} else {
-				if(ls[dname]) ls.removeItem(dname);
-				if(ss[dname]) ss.removeItem(dname);
-			}
-		},
-
-		cookie: function(){
-			if(!arguments.length) return;
-
-			if(arguments.length==1){
-				var dCookie = doc.cookie;
-				if(dCookie.length<=0) return;
-
-				var cname = arguments[0],
-					cStart = dCookie.indexOf(cname+'=');
-				if(cStart!=-1){
-					cStart = cStart + cname.length + 1;
-					cEnd   = dCookie.indexOf(';', cStart);
-					if(cEnd==-1) cEnd = dCookie.length;
-					return unescape(dCookie.substring(cStart,cEnd));
-				}
-			} else {
-				var cname = arguments[0], val = arguments[1], seconds = arguments[2] || 60,
-					exdate = new Date(), expires = '';
-				exdate.setTime( exdate.getTime()+(seconds*1000) );
-				expires = '; expires='+exdate.toGMTString();
-				doc.cookie = cname + '=' + escape(val) + expires + '; path=/';
-			}
-		},
-
-		clearCookie: function(cname){
-			iCat.View.cookie(cname, '', -1);
-		},
-
-		makeWrap: function(s, pNode){
-			if(!s) return;
-
-			if(iCat.isString(s)){
-				var o = doc.createElement('div'),
-					exp;
-				if(s.indexOf('~')>=0){
-					s = s.split('~');
-					pNode = iCat.util.queryOne(s[0]);
-					exp = s[1];
-				} else {
-					pNode = pNode || doc.body;
-					exp = s;
-				}
-				
-				var c = exp.trim().split('*'),
-					cSelector = c[0],
-					num = c[1] || 1,
-					shtml = '',
-
-					strHtml = cSelector
-								.replace(/(\w+)([\.\#\w\-\d]+)/, '<$1$2></$1>')
-								.replace(/\.([\.\w\-\d]+)/g, ' class="$1"').replace(/\./g, ' ')
-								.replace(/\#([\w\-\d]+)/g, ' id="$1"');
-
-				for(var i=0; i<num; i++){ shtml += strHtml; }
-				o.innerHTML = shtml;
-				itemNodes = o.childNodes;
-				while(itemNodes.length>0){ pNode.appendChild(itemNodes[0]); }
-			} else {
-				var fn = arguments.callee;
-				s.forEach(function(v){
-					fn(v);
+		_regEvents: function(view){// bind-events
+			var self = this,
+				vid = view.viewId,
+				events = iCat.Model.__pageData[vid].config.events;
+			if(events){
+				iCat.util.recurse(events, function(e){
+					//此处如果直接e.callback=f，e.callback已被替换，无法找到函数
+					var fn = e.callback;
+					if(iCat.isString(fn)) fn = view[e.callback];
+					e.callback = function(){
+						var argus = iCat.toArray(arguments); //step2
+							argus.unshift(view, view.model, iCat.Model.__pageData[view.viewId].config);//普通方法追加view, model, config
+						fn.apply(this, argus);
+					};
+					self._subscribe(e);
 				});
 			}
 		},
 
-		fullUrl: function(url, argu){//isAjax/bi
-			var url = url || '',
-				bi = iCat.isString(argu)? argu : '',
-				isAjax = iCat.isBoolean(argu)? argu : false;
+		vmAdd: function(vm, init){
+			if(!vm || !iCat.isObject(vm)) return;
 
-			url = url.replace(/^\//g, '');
-
-			if(iCat.DemoMode && url!==''){
-				url = url.indexOf('?')<0? (url+'.php') : url.replace(/(\?)/g, '.php$1');
-			}
-			if(!isAjax && bi){
-				url = url + (url.indexOf('?')<0? '?':'&') + bi;
-			}
-
-			return iCat.PathConfig.pageRef + url;
-		}
-	});
-
-	/*
-	 * view-module职责：
-	 * - 初始化页面刚进入时的模板函数（及数据），渲染模块
-	 * - 接收controller传递过来的数据，并更新渲染模块
-	 * - 获取用户‘输入的表单数据’，传递给controller
-	 * - 扩展实例化后对象的方法
-	 */
-	
-	function View(tempId, initData){
-		var _self = this;
-		
-		_self.tempId = tempId;
-
-		_self._render = function(data, clear){
-			iCat.util.waitObj(function(k){
-				var pNode = iCat.util.queryOne(data.ICwrap);
-				if(!pNode){
-					iCat.__cache_timers[k] = false;
-					return;
+			var self = this,
+				vmGroups = self.vmGroups;
+			iCat.util.recurse(vm, function(item){//instanceof => false
+				//view必须有，且是View的实例化 
+				if(!item.view ||
+					(iCat.isObject(item.view) && item.view.constructor.__super__!==View)) return;
+				
+				if(iCat.isFunction(item.model) && item.model.__super__==Model){
+					iCat.foreach(
+						item.model.setting || {'__page_mainModel': {}},// default= '__page_mainModel'
+						function(key, setItem){
+							item.model = iCat.Model[key] || new item.model(key, setItem);
+						}
+					);
 				}
 
-				iCat.__cache_timers[k] = true;
-				data.ICwrap = pNode;
-				iCat.View.render(_self.tempId, data);
+				if(iCat.isFunction(item.view) && item.view.__super__==View){
+					iCat.foreach(
+						item.view.setting || {'__page_mainView': {config:{}}},// default= '__page_mainView'
+						function(key, setItem){
+							if(init && self.pageMods && !self.pageMods.contains(key)) return;
+							var curView = iCat.View[key] || new item.view(key, setItem);
+							if(!vmGroups[key]){
+								if(init){//(伪)初始化时
+									if(curView.model){
+										delete curView.model;
+									} else {
+										if(!item.model){
+											item.model = iCat.Model['__page_emptyModel'] || new Model('__page_emptyModel');
+										}
+									}
+									vmGroups[key] = item.model.modelId;
+								}
+								else if(item.model){
+									curView.setModel(item.model);
+									vmGroups[key] = item.model.modelId;
+								}
+							}
 
-				// 包含表单
-				var form = /form/i.test(pNode.tagName)?
-						pNode : iCat.util.queryOne('form', pNode);
-				if(form){
-					_self.getData = function(format){
-						format = format || 'string';
-						var jsonFormat = /json/i.test(format),
-							argus = jsonFormat? {} : '';
+							if(setItem.config.scrollWrap || self.config.scrollWrap)
+								self.routes.scrollWrap = self.config.scrollWrap || setItem.config.scrollWrap;
+							self._regEvents(curView);
+						}
+					);
+				} else {
+					var curView = item.view,
+						key = curView.viewId,
+						cfg = iCat.Model.__pageData[curView.viewId].config;
+					if(!vmGroups[key]){
+						if(init){//(伪)初始化时
+							if(curView.model){
+								delete curView.model;
+							} else {
+								if(!item.model){
+									item.model = iCat.Model['__page_emptyModel'] || new Model('__page_emptyModel');
+								}
+							}
+							vmGroups[key] = item.model.modelId;
+						}
+						else if(item.model){
+							curView.setModel(item.model);
+							vmGroups[key] = item.model.modelId;
+						}
+					}
+					self._regEvents(curView);
+				}
+			});
+		},
 
-						iCat.toArray(form.elements).forEach(function(el){
-							var key = el.getAttribute('name'), value = el.value;
-							if(key){
-								jsonFormat?
-									argus[key] = value : argus += '&' + key + '=' + value;
+		vmRemove: function(vid){
+			if(!vid) return;
+
+			var self = this;
+			if(iCat.isString(vid) && vid.indexOf(',')<0){
+				var vmGroups = self.vmGroups;
+				if(vmGroups[vid]){
+					var events = iCat.Model.__pageData[vid].config.events;
+					if(events){
+						iCat.util.recurse(events, function(o){
+							Event.undelegate(o);
+							if(self.selectors.contains(o.selector)){
+								self.selectors.remove(o.selector);
 							}
 						});
-						return jsonFormat? argus : argus.replace(/^&/, '');
 					}
+					delete vmGroups[vid];
 				}
-			});
-		};
-
-		if(initData){
-			_self._render(initData);
-		}
-	}
-	View.prototype = {
-
-		addItem: function(d){
-			this._render(d);
+			} else {
+				var fn = arguments.callee;
+				vid = iCat.isString(vid)? vid.split(',') : vid;
+				iCat.isArray(vid)?// fixed bug:当调用fn时，其中的this指向window
+					vid.forEach(function(k){fn.call(self, k);}) : iCat.foreach(vid, function(k){fn.call(self, k);});
+			}
 		},
 
-		setData: function(d){
-			this._render(d, true);
-		},
-
-		extend: function(o){
-			iCat.mix(this, o);
-		}
+		vmClear: function(){ this.vmRemove(this.vmGroups); }
 	};
 
-	//对外接口
-	iCat.View = function(module, data){
-		if(!module) return;
+	// 对外接口
+	iCat.namespace('View', 'Model', 'Controller');
+	iCat.View.extend       = function(opt){ return iCat.util._inherit(View, opt); };
+	iCat.Model.extend      = function(opt){ return iCat.util._inherit(Model, opt); };
+	iCat.Controller.extend = function(opt){ return iCat.util._inherit(Controller, opt); };
 
-		if(!iCat.View[module]){
-			iCat.View[module] = new View(module);
-		}
-		if(data){
-			iCat.View[module].setData(data);
-		}
-		return iCat.View[module];
-	};
-
-	iCat.mix(iCat.View, {
-		render: iCat.util.render,
-		destroy: function(modules){
-			if(!modules) return;
-
-			modules = iCat.isString(modules) ? [modules] : modules;
-			modules.forEach(function(v){
-				delete iCat.View[v];
-			});
-		}
-	});
-
-	/*
-	 * model-module职责：
-	 * - 处理controller传递过来的数据，进行封装返回
-	 * - 处理数据层面的业务逻辑，进行封装返回
-	 * - 按需存取数据
-	 * - 扩展实例化后对象的方法
-	 */
-	function Model(module, initData){
-		this.module = module;
-		this.initData = initData;
-	}
-	Model.prototype = {
-
-		getInitData: function(dname){
-			return this.initData[dname || ''];
-		},
-
-		fetchData: function(){},
-
-		storeData: function(){},
-		
-		extend: function(o){
-			iCat.mix(this, o);
-		}
-	};
-
-	//对外接口
-	iCat.Model = function(module, data){
-		if(!module) return;
-
-		if(!iCat.Model[module]){
-			iCat.Model[module] = new Model(module, data);
-		} else {
-			iCat.Model[module].initData = data || iCat.Model[module].initData;
-		}
-		return iCat.Model[module];
-	};
-	
+	iCat.Model['__pageData'] = iCat.Model['__pageData'] || {};
 	iCat.mix(iCat.Model, {
-		
-		storage: iCat.util.storage,
+		cfgChange: function(vid, d){
+			var oldCfg = iCat.Model.__pageData[vid].config,
+				ret = (d.ajaxUrl && oldCfg.ajaxUrl!=d.ajaxUrl) ||
+					  (d.tempId && oldCfg.tempId!=d.tempId) ||
+					  (d.wrap && oldCfg.wrap!=d.wrap);
+			iCat.mix(oldCfg, d);
+			return ret;
+		},
 
-		clearStorage: iCat.util.clearStorage,
-
-		cookie: iCat.util.cookie,
-
-		clearCookie: iCat.util.clearCookie,
-
-		destroy: function(modules){
-			if(!modules) return;
-			modules = iCat.isString(modules) ? [modules] : modules;
-			modules.forEach(function(v){
-				delete iCat.Model[v];
-			});
+		dataChange: function(vid, d){
+			var oldData = iCat.Model.__pageData[vid].prevData,
+				ret = !iCat.util.jsonCompare(d, oldData);
+			iCat.Model.__pageData[vid].prevData = JSON.stringify(d);
+			return ret;
 		}
 	});
 
-	/*
-	 * controller-module职责：
-	 * - 响应用户动作，调用对应的View和Model
-	 * - 在View/Model之间传递数据
-	 * - 如果是apk，添加或调用硬件接口
-	 * - 扩展实例化后对象的方法
-	 */
-	
-	var Event = iCat.Event;
-
-	// 创建Observer-Controller类
-	function Controller(module){
-		this.selectors = [];
-		this.module = module;
-	}
-	Controller.prototype = {
-		subscribe: function(o){//o同Event.delegate
-			var _self = this;
-			o = iCat.isArray(o)? o : [o];
-			o.forEach(function(item){
-				Event.delegate(item, true);
-				if(!_self.selectors.contains(item.selector)){
-					_self.selectors.push(item.selector);
-				}
-			});
-		},
-
-		unsubscribe: function(o){//o同Event.undelegate
-			var _self = this;
-			o = iCat.isArray(o)? o : [o];
-			o.forEach(function(item){
-				Event.undelegate(item);
-				if(_self.selectors.contains(item.selector)){
-					_self.selectors.remove(item.selector);
-				}
-			});
-		},
-
-		addEvents: function(events){
-			this.subscribe(events);
-		},
-
-		removeEvents: function(events){
-			this.unsubscribe(events);
-		},
-
-		extend: function(o){
-			iCat.mix(this, o);
-		}
-	};
-
-	//对外接口
-	iCat.Controller = function(module, events){
-		if(!module) return;
-
-		if(!iCat.Controller[module]){
-			iCat.Controller[module] = new Controller(module);
-		}
-		if(iCat.isFunction(events)){
-			events(iCat.Controller[module]);
-		} else {
-			iCat.Controller[module].subscribe(events);
-		}
-		return iCat.Controller[module];
-	};
-
-	//销毁实例化对象
-	iCat.mix(iCat.Controller, {
-		addCurrent: function(modules, callback){
-			if(!modules) return;
-			modules = iCat.isString(modules) ? [modules] : modules;
-			modules.forEach(function(v){
-				if(iCat.Controller[v]){
-					Event.__event_selectors = Event.__event_selectors.concat(iCat.Controller[v].selectors);
-				}
+	iCat.mix(iCat, {
+		ctrlAble: function(arrCtrl, callback){
+			if(!arrCtrl) return;
+			arrCtrl = iCat.isArray(arrCtrl) ? arrCtrl : [arrCtrl];
+			arrCtrl.forEach(function(item){
+				Event.__event_selectors = Event.__event_selectors.concat(item.selectors);
 			});
 			if(callback && iCat.isFunction(callback)){
 				callback();
 			}
 		},
 
-		destroy: function(modules){
-			if(!modules) return;
-			modules = iCat.isString(modules) ? [modules] : modules;
-			modules.forEach(function(v){
-				if(iCat.Controller[v]){
-					iCat.Controller[v].selectors.forEach(function(v){
-						delete Event.items[v];
-						Event.__event_selectors.remove(v);
-					});
-				}
-				delete iCat.Controller[v];
+		ctrlDisable: function(arrCtrl){
+			if(!arrCtrl) return;
+			arrCtrl = iCat.isArray(arrCtrl) ? arrCtrl : [arrCtrl];
+			arrCtrl.forEach(function(item){
+				item.selectors.forEach(function(v){
+					delete Event.items[v];
+					Event.__event_selectors.remove(v);
+				});
 			});
 		}
 	});

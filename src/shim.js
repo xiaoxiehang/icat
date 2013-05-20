@@ -449,116 +449,75 @@
 	/*-------------------------------------------*
 	 * util
 	 *-------------------------------------------*/
-	
-	Shim.mix = function(r, s, wl, ov){
-		if (!s || !r) return r;
-		if (!ov) ov = true;
-		var i, p, len;
+	function _mix(r, s, ov){
+		if(!s || !r) return r;
+		if(ov===undefined) ov = true;
 
-		if (wl && (len = wl.length)) {
-			for (i = 0; i < len; i++) {
-				p = wl[i];
-				if (p in s) {
-					if (ov || !(p in r)) {
-						r[p] = s[p];
-					}
-				}
-			}
-		} else {
-			for (p in s) {
-				if (ov || !(p in r)) {
-					r[p] = s[p];
-				}
+		for(var p in s) {
+			if(ov || !(p in r)){
+				r[p] = s[p];
 			}
 		}
 		return r;
-	};
+	}
 
 	// kinds of browsers
-	var __UA = navigator.userAgent,
-		docElem = doc.documentElement,
-		supportTouch = ('createTouch' in doc) || ('ontouchstart' in root);
-
-	Shim.mix(Shim, {
-		matchesSelector: docElem.matchesSelector || docElem.mozMatchesSelector ||
-			docElem.webkitMatchesSelector || docElem.oMatchesSelector || docElem.msMatchesSelector,
-		
-		/* browser */
-		safari: /webkit/i.test(__UA),
+	var __UA = navigator.userAgent;
+	Shim.browser = {
+		mozilla: /mozilla/i.test(__UA) && !/(compatible|webkit)/i.test(__UA),
+		webkit: /webkit/i.test(__UA),
 		opera: /opera/i.test(__UA),
-		msie: /msie/i.test(__UA) && !/opera/i.test(__UA),
-		mozilla: /mozilla/i.test(__UA) && !/(compatible|webkit)/i.test(__UA)
+		msie: /msie/i.test(__UA) && !/opera/i.test(__UA)
+	};
+
+	var docElem = doc.documentElement;
+	Shim.matchesSelector = docElem.matchesSelector || docElem.mozMatchesSelector ||
+			docElem.webkitMatchesSelector || docElem.oMatchesSelector || docElem.msMatchesSelector;
+
+	// 自身方法
+	_mix(Shim, {
+		util: {},
+		Event: {},
+		loader: {},
+		//toArray: function(){},
 	});
 
-	Shim.mix(Shim, {
-
+	// util方法
+	_mix(Shim.util, {
 		//_sizzle: function(){},
 		//_matches: function(){},
-
 		//_ready: function(){},
-
-		_load: function(MG, LG, option, pNode, node, iCat){
-			if(SHIM.msie){
-				var timer = setInterval(function(){
-					try{
-						document.documentElement.doScroll('left');//在IE下用能否执行doScroll判断dom是否加载完毕
-					}catch(e){
-						return;
-					}
-					
-					clearInterval(timer);
-					if(node.readyState){
-						node.onreadystatechange = function(){
-							if(node.readyState == "loaded" || node.readyState == "complete") {
-								node.onreadystatechange = null;
-								if(option.callback && iCat.isFunction(option.callback))
-									option.callback(option.context || iCat);
-								
-								if(option.modName){
-									MG[option.modName] = true;
-								}
-								LG[option.file] = true;
-							}
-						};
-					}
-					pNode.appendChild(node);
-				},1);
-			} else {
-				node.onload = function(){
-					if(option.callback && iCat.isFunction(option.callback))
-						option.callback(option.context || iCat);
-					
-					if(option.modName){
-						MG[option.modName] = true;
-					}
-					LG[option.file] = true;
-				};
-				pNode.appendChild(node);
-			}
-		}
 	});
-
-	Shim.event = {
+	
+	// event
+	_mix(Shim.Event, {
 		_bindEvent: function(el, type, handler){//单个绑定
 			el.events = el.events || {};
 			el.types = el.types || [];
+			var _fn = el.events[type] = function(evt){
+				evt = evt || window.event;
+				evt.target = evt.target || evt.srcElement;
+				evt.preventDefault = evt.preventDefault || function(){evt.returnValue = false;};
+				evt.stopPropagation = evt.stopPropagation || function(){evt.cancelBubble = true;};
+				handler.call(el, evt);// fixed bug:this指向了window
+			};
 
-			el.events[type] = handler;
-			if(el.types.indexOf(type)==-1)// 请用click.submit来绑定同一el的同类型事件
+			if(el.types.indexOf(type)<0){//绑定同el的同type事件，请用type.xxx方式
 				el.types.push(type);
+			}
 
 			type = type.replace(/\..*/g, '');
 			if(el.addEventListener){
-				el.addEventListener(type, el.events[type], false);
+				el.addEventListener(type, _fn, false);
 			} else if(el.attachEvent) {
-				el.attachEvent('on'+type, Event[eventId]);
+				el.attachEvent('on'+type, _fn);
 			} else {
-				el['on'+type] = handler;
+				el['on'+type] = _fn;
 			}
 		},
 
 		_unbindEvent: function(el, type){//单个解绑
-			if(!el.events || el.types.indexOf(type)==-1) return;
+			if(!el.events || el.types.indexOf(type)<0) return;
 			
 			var handler = el.events[type];
 				type = type.replace(/\..*/g, '');
@@ -570,35 +529,38 @@
 				el['on'+type] = null;
 			}
 
-			if(iCat.isEmptyObject(el.events) || !el.types.length){
+			if(ICAT.isEmptyObject(el.events) || !el.types.length){
 				el.events = null;
 				el.types = null;
 			}
 		},
 
-		preventDefault: function(evt){
-			if(evt && evt.preventDefault)
-				evt.preventDefault();
-			else
-				window.event.returnValue = false;
-		},
-
-		stopPropagation: function(evt){
-			if(window.event){
-				window.event.cancelBubble = true;
-			} else {
-				evt.stopPropagation();
-			}
-		},
-
 		trigger: function(el, type, bubbles, cancelable){
-			if(doc.createEventObject){
-				var evt = doc.createEventObject();
-				el.fireEvent('on'+type, evt);
-			} else {
-				var ev = doc.createEvent('Event');
-				ev.initEvent(type, bubbles, cancelable);
-				el.dispatchEvent(ev);
+			if(iCat.isObject(el) && !iCat.isjQueryObject(el)){// 普通对象
+				el[type] && el[type].apply(el, bubbles);
+				return;
+			}
+
+			if(iCat.isjQueryObject(el)) {// jquery对象
+				if(el.trigger){
+					el.trigger(type);
+					return;
+				} else el = el.get(0);
+			}
+
+			if(/\:dg$/i.test(type)){// 事件代理
+				type = type.replace(/\:dg$/i, '');
+				el = iCat.util.queryOne(el);
+				Event._execute(type, el);
+			}  else {
+				if(doc.createEventObject){
+					var evt = doc.createEventObject();
+					el.fireEvent('on'+type, evt);
+				} else {
+					var ev = doc.createEvent('Event');
+					ev.initEvent(type, bubbles, cancelable);
+					el.dispatchEvent(ev);
+				}
 			}
 		},
 
@@ -613,7 +575,7 @@
 					}
 				};
 
-			if(Shim.msie){
+			if(Shim.browser.msie){
 				(function(){
 					try{
 						doc.documentElement.doScroll('left');
@@ -628,32 +590,75 @@
 						}
 					};
 				})();
-			} else if(Shim.webkit && doc.readyState){
+			}
+			else if(Shim.browser.webkit && doc.readyState){
 				(function(){
-					if(doc.readyState!=='loading'){
-						_do();
-					} else {
-						setTimeout(arguments.callee, 10);
-					}
+					doc.readyState!=='loading'?
+						_do() : setTimeout(arguments.callee, 10);
 				})();
-			} else if(doc.addEventListener){
+			}
+			else if(doc.addEventListener){
 				doc.addEventListener('DOMContentLoaded', _do, false);
-			} else {
+			}
+			else {
 				window.onload = _do;
 			}
 
 			return function(fn){
-				if(iCat.isFunction(fn)){
+				if(ICAT.isFunction(fn)){
 					_fn[_fn.length] = fn;
 				}
 				return fn;
 			};
 		}()
-	};
+	});
 
-	Shim.mix(Shim, {});
-
-	Shim.util = {
-
-	};
+	// loader
+	_mix(Shim.loader, {
+		_loadedGroup: {},//loaded-js
+		_modGroup: {},//loaded-module
+		_fnLoad: function(option, pNode, node){
+			if(Shim.browser.msie){
+				var timer = setInterval(function(){
+					try{
+						//在IE下用能否执行doScroll判断dom是否加载完毕
+						document.documentElement.doScroll('left');
+					}catch(e){
+						return;
+					}
+					
+					clearInterval(timer);
+					if(node.readyState){
+						node.onreadystatechange = function(){
+							if(node.readyState == "loaded" || node.readyState == "complete"){
+								node.onreadystatechange = null;
+								if(option.callback && ICAT.isFunction(option.callback))
+									option.callback(option.context || ICAT);
+								if(option.modName)
+									Shim.loader._modGroup[option.modName] = true;
+								Shim.loader._loadedGroup[option.file] = true;
+								if(!ICAT.$ && (root['jQuery'] || root['Zepto'])){
+									ICAT.$ = root['jQuery'] || root['Zepto'];
+								}
+							}
+						};
+					}
+					pNode.appendChild(node);
+				},1);
+			}
+			else {
+				node.onload = function(){
+					if(option.callback && ICAT.isFunction(option.callback))
+						option.callback(option.context || ICAT);
+					if(option.modName)
+						Shim.loader._modGroup[option.modName] = true;
+					Shim.loader._loadedGroup[option.file] = true;
+					if(!ICAT.$ && (root['jQuery'] || root['Zepto'])){
+						ICAT.$ = root['jQuery'] || root['Zepto'];
+					}
+				};
+				pNode.appendChild(node);
+			}
+		}
+	});
 }).call(this, document);

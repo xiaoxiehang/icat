@@ -1,18 +1,18 @@
 /*!
- * Copyright 2011~2013, ICAT JavaScript Library v1.1.4
+ * Copyright 2011~2013, ICAT JavaScript Library v1.1.5
  * https://github.com/valleykid/icat
  *
  * Copyright (c) 2013 valleykid
  * Licensed under the MIT license.
  *
  * @Author valleykiddy@gmail.com
- * @Time 2013-04-20 08:50:00
+ * @Time 2013-04-27 18:00:00
  */
 
 /* core.js # */
 (function(){
-	// Create the root object, 'window' in the browser, or 'global' on the server.
-	var root = this, doc = document, iCat = { version: '1.1.4' };
+	// Create the root object, 'root' in the browser, or 'global' on the server.
+	var root = this, doc = document, iCat = { version: '1.1.5' };
 	
 	// Export the ICAT object for **Node.js**
 	if(typeof exports!=='undefined'){
@@ -25,27 +25,43 @@
 	}
 
 	// Compatible plugin for PC
-	root['SHIM'] = root['SHIM'] || {};
+	iCat.Shim = root['SHIM'] || {};
+
+	// jQuery/Zepto coming in
+	iCat.$ = root['jQuery'] || root['Zepto'];
 
 	// Copies all the properties of s to r.
-	// w(hite)l(ist):白名单, ov(erwrite):覆盖
-	iCat.mix = SHIM.mix || function(r, s, wl, ov){
-		if (!s || !r) return r;
-		if (!ov) ov = true;
-		var i, p, len;
+	// l(ist):黑/白名单, ov(erwrite):覆盖
+	iCat.mix = function(r, s, l, ov){
+		if(!s || !r) return r;
+		if(ov===undefined) ov = true;
+		var i, p, len, white = true;
 
-		if (wl && (len = wl.length)) {
-			for (i = 0; i < len; i++) {
-				p = wl[i];
-				if (p in s) {
-					if (ov || !(p in r)) {
+		if(l && !Array.isArray(l)){
+			l = l.replace(/\s+/g, '').split(',');
+			white = false;
+		}
+
+		if(l && (len=l.length)){
+			if(white){
+				for(i=0; i<len; i++){
+					p = l[i];
+					if(p in s){
+						if(ov || !(p in r)){
+							r[p] = s[p];
+						}
+					}
+				}
+			} else {
+				for(p in s){
+					if(l.indexOf(p)<0 && (ov || !(p in r))){
 						r[p] = s[p];
 					}
 				}
 			}
 		} else {
-			for (p in s) {
-				if (ov || !(p in r)) {
+			for(p in s) {
+				if(ov || !(p in r)){
 					r[p] = s[p];
 				}
 			}
@@ -57,7 +73,7 @@
 	iCat.mix(Array.prototype, {
 		//数组中是否包含指定元素
 		contains: function(item){
-			return this.indexOf(item)==-1? false : true;
+			return this.indexOf(item)<0? false : true;
 		},
 		//数组去掉指定元素
 		remove: function(item){
@@ -92,7 +108,6 @@
 	});
 
 	iCat.mix(iCat, {
-
 		DebugMode: /debug/i.test(_href),
 		DemoMode: /localhost|demo\.|\/{2}\d+(\.\d+){3}|file:/i.test(_href),
 		TestMode: /3gtest\./i.test(_href),
@@ -104,11 +119,20 @@
 		},
 
 		isjQueryObject: function(obj){
-			return typeof $!=='undefined' && obj instanceof $;
+			return iCat.$ && obj instanceof iCat.$;
 		},
 
-		toArray: SHIM.toArray || function(o){
+		toArray: iCat.Shim.toArray || function(o){
 			return Array.prototype.slice.call(o);
+		},
+
+		contains: function(o, p){
+			if(iCat.isArray(o)){
+				return o.contains(p);
+			}
+			else if(iCat.isObject){
+				return p in o;
+			}
 		},
 		
 		// Handles objects with the built-in 'foreach', arrays, and raw objects.
@@ -185,6 +209,26 @@
 			}
 		},
 
+		rentAjax: function(fnAjax, cfg){
+			if(!fnAjax || !iCat.isFunction(fnAjax)) return function(){};
+			iCat.util.ajax = function(cfgAjax, success, error){
+				cfgAjax = iCat.mix(cfgAjax, cfg);
+				var _success = cfgAjax.success,
+					_error = cfgAjax.error;
+				cfgAjax.success = function(data){
+					if(!data) return;
+					data = iCat.isObject(data)? data : JSON.parse(data);
+					var ret = _success? _success(data) : '';
+					success(ret || data);
+				};
+				cfgAjax.error = function(){
+					var ret = _error? _error() : '';
+					error(ret);
+				};
+				fnAjax(cfgAjax);
+			};
+		},
+
 		// iCat或app下的namespace，相当于扩展出的对象
 		namespace: function(){
 			var a = arguments, l = a.length, o = null, i, j, p;
@@ -217,7 +261,7 @@
 			} else {
 				try{ __$abc_ICAT(); }
 				catch(e){
-					var fileline = e.stack.split('\n')[2];
+					var fileline = e.stack.replace(/\n\s+at\s+<.*>/g, '').split('\n')[2];// fixed bug:Direction on an input element that cannot have a selection.
 					fileline = fileline.replace(/.*[\(\s]|\).*/g, '').replace(/(.*):(\d+):\d+/g, '$1  line $2:\n');
 					console.log(fileline, msg);
 				}

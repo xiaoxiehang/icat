@@ -1,23 +1,5 @@
 /* event.js # */
 (function(iCat, root, doc){
-
-	/* 本模块公用方法 */
-	iCat.util({
-		parentIfText: function(node){
-			return 'tagName' in node ? node : node.parentNode;
-		},
-
-		bubble: function(node, cb){
-			if(!node) return;
-			while(node!==doc.body){
-				if(cb && iCat.isFunction(cb)){
-					if(cb(node)==false) break;
-				}
-				node = node.parentNode;
-			}
-		}
-	});
-
 	// 创建Event命名空间
 	var Event = iCat.namespace('Event');
 
@@ -25,19 +7,13 @@
 		_bindEvent: function(el, type, handler){
 			el.events = el.events || {};
 			el.types = el.types || [];
-			el.events[type] = function(evt){
-				evt = evt || window.event;
-				evt.target = evt.target || evt.srcElement;
-				evt.preventDefault = evt.preventDefault || function(){evt.returnValue = false;};
-				evt.stopPropagation = evt.stopPropagation || function(){evt.cancelBubble = true;};
-				handler(evt);
-			};
+			var _fn = el.events[type] = handler;
 
 			//绑定同el的同type事件，请用type.xxx方式
 			!el.types.contains(type) && el.types.push(type);
 
 			if(el.addEventListener)
-				el.addEventListener(type.replace(/\..*/g, ''), el.events[type], false);
+				el.addEventListener(type.replace(/\..*/g, ''), _fn, false);
 		},
 
 		_unbindEvent: function(el, type){
@@ -54,32 +30,36 @@
 			}
 		},
 
-		_execute: function(eType, el, argus){
+		_execute: function(eType, el, evt, argus){
+			eType = eType.toLocaleLowerCase();
 			iCat.util.bubble(el, function(node, index){
 				index = iCat.util.matches(node, Event.__event_selectors);
-				var _stopBubble = false;
+				var _preventDef = false, _stopBubble = false;
 				if(iCat.isNumber(index)){
 					var el = Event.items[Event.__event_selectors[index]];
-					eType = eType.replace(/click|tap/gi, 'tap').replace(/moving|swiping/gi, 'swiping');
-					if(el.types.contains(eType)){
+					if(el && el.types.contains(eType)){// fixed bug:el有时候找不到
 						iCat.foreach(el.events, function(k, v){
 							k = k.replace(/\.\w+/g, '').split('|');
 							if(k[0]==eType){
-								if(eType=='hover'){
-									v[argus].apply(node);
-								} else { v.apply(node, argus); }
+								argus = argus!==undefined? argus : [];// fixed bug:当argus是0时，没有传0
+								iCat.isArray(argus)?
+									argus.push(evt) : argus = [evt,argus]; //step1
+								v.apply(node, argus);
 							}
-							if(k[1]==0){//preventDefault - false
-								Event.trigger(node, 'click', false, true);
-							}
-							if(k[2]==1){//stopPropagation - true
-								_stopBubble = true;
-								return false;
-							}
+							
+							_preventDef = k[1]==0? false : true;
+							_stopBubble = k[2]==0? false : true;
+							//return false; fixed bug:阻止了本元素其他事件的执行
 						});
+						if(_preventDef){//阻止默认事件
+							Event.on(node, 'click.prevent', function(evt){ evt.preventDefault(); });
+						}
 					}
 				}
-				if(_stopBubble) return false;
+
+				if(_stopBubble){//阻止冒泡
+					return false;
+				}
 			});
 		},
 
@@ -88,11 +68,10 @@
 			el = iCat.util.queryAll(el);
 			if(iCat.isjQueryObject(el)){//兼容jquery
 				el.bind? el.bind(type, handler) :
-							arguments.callee(iCat.util.queryAll(el.selector), type, handler);
+					arguments.callee(iCat.util.queryAll(el.selector), type, handler);
 			} else {
 				el.length===undefined ?
-					Event._bindEvent(el, type, handler)
-					:
+					Event._bindEvent(el, type, handler) :
 					iCat.foreach(el, function(i,v){
 						Event._bindEvent(v, type, handler);
 					});
@@ -104,11 +83,10 @@
 			el = iCat.util.queryAll(el);
 			if(iCat.isjQueryObject(el)){//兼容jquery
 				el.unbind? el.unbind(type) :
-							arguments.callee(iCat.util.queryAll(el.selector), type);
+					arguments.callee(iCat.util.queryAll(el.selector), type);
 			} else {
 				el.length===undefined ?
-					Event._unbindEvent(el, type)
-					:
+					Event._unbindEvent(el, type) :
 					iCat.foreach(el, function(i,v){
 						Event._unbindEvent(v, type);
 					});
@@ -116,7 +94,6 @@
 		},
 
 		trigger: function(el, type, bubbles, cancelable){
-
 			if(iCat.isObject(el) && !iCat.isjQueryObject(el)){// 普通对象
 				el[type] && el[type].apply(el, bubbles);
 				return;
@@ -126,8 +103,7 @@
 				if(el.trigger){
 					el.trigger(type);
 					return;
-				} else
-					el = el.get(0);
+				} else el = el.get(0);
 			}
 
 			if(/\:dg$/i.test(type)){// 事件代理
@@ -135,7 +111,6 @@
 				el = iCat.util.queryOne(el);
 				Event._execute(type, el);
 			}  else { // 普通元素
-				if(!doc.createEvent) return;
 				var ev = doc.createEvent('Event');
 				ev.initEvent(type, bubbles, cancelable);
 				el.dispatchEvent(ev);
@@ -155,11 +130,8 @@
 
 			if(doc.readyState){
 				(function(){
-					if(doc.readyState!=='loading'){
-						_do();
-					} else {
-						setTimeout(arguments.callee, 10);
-					}
+					doc.readyState!=='loading'?
+						_do() : setTimeout(arguments.callee, 10);
 				})();
 			}
 
@@ -183,25 +155,47 @@
 			if(!o || iCat.isEmptyObject(o) || o==[]) return;
 			var arrSele = Event.__event_selectors;
 			var objItem = Event.items = Event.items || {};
+			var _refuseSham = /!$/.test(o.type);
+			o.type = o.type.toLocaleLowerCase();
+			o.type = _refuseSham? o.type.replace(/!/g,'') : o.type.replace(/click/g,'tap').replace(/mov/g,'swip');
 
 			if(iCat.isObject(o)){
-				if(!arrSele.contains(o.selector) && !disabled) arrSele.push(o.selector);
-				o.type = o.type.replace(/click|tap/gi, 'tap').replace(/moving|swiping/gi, 'swiping');
-
-				var el = objItem[o.selector] = objItem[o.selector] || {},
-					key = o.type + '|' + (o.preventDefault? 1:0) + '|' + (o.stopPropagation? 1:0);
-				el.events = el.events || {};
-				el.types = el.types || [];
-
-				el.events[key] = o.callback;
-				o.type = o.type.replace(/\..*/g, '');
-				!el.types.contains(o.type) && el.types.push(o.type);
-				
-			} else if(iCat.isArray(o)){
-				while(o.length){
-					arguments.callee(o[0]);
-					o.shift();
+				if(/blur|focus|load|unload|change/i.test(o.type)){//不适合代理的事件
+					iCat.util.wait(function(k){
+						var node = iCat.util.queryAll(o.selector);
+						if(!node || !node.length){
+							iCat.__cache_timers[k] = false;
+							return;
+						}
+						delete iCat.__cache_timers[k];
+						Event.on(node, o.type, o.callback);
+					}, 500, 10);
 				}
+				else {
+					if(!arrSele.contains(o.selector) && !disabled) arrSele.push(o.selector);
+					var el = objItem[o.selector] = objItem[o.selector] || {},
+						key = o.type + '|' + (o.preventDefault? 1:0) + '|' + (o.stopPropagation? 1:0);
+					el.events = el.events || {};
+					el.types = el.types || [];
+
+					o.type = o.type.replace(/\..*/g, '');
+					el.types.indexOf(o.type)<0 && el.types.push(o.type);
+					el.events[key] = o.callback;
+
+					if(!/tap|swip|hover/i.test(o.type) || _refuseSham){//非模拟事件
+						if(!iCat.el_bodyWrap.events[o.type]){
+							Event.on(iCat.el_bodyWrap, o.type, function(evt){
+								Event._execute(o.type, evt.target, evt);
+							});
+						}
+					}
+				}
+			}
+			else if(iCat.isArray(o)){
+				o.forEach(function(item){
+					arguments.callee(item);
+					o.shift();
+				});
 			}
 		},
 
@@ -210,38 +204,47 @@
 			if(!o || iCat.isEmptyObject(o) || o==[]) return;
 			var arrSele = Event.__event_selectors;
 			var objItem = Event.items = Event.items || {};
+			var _refuseSham = /!$/.test(o.type);
+			o.type = o.type.toLocaleLowerCase();
+			o.type = _refuseSham? o.type.replace(/!/g,'') : o.type.replace(/click/g,'tap').replace(/mov/g,'swip');
 
 			if(iCat.isObject(o)){
-				if(!arrSele.contains(o.selector) || !objItem[o.selector]) return;
+				if(/blur|focus|load|unload|change/i.test(o.type)){
+					Event.off(iCat.util.queryAll(o.selector), o.type);
+				} else {
+					if(!arrSele.contains(o.selector) || !objItem[o.selector]) return;
+					arrSele.remove(o.selector);
+					var el = objItem[o.selector];
 
-				arrSele.remove(o.selector);
-				var el = objItem[o.selector];
-				o.type = o.type.replace(/click|tap/gi, 'tap').replace(/moving|swiping/gi, 'swiping');
+					if(el.types.contains(o.type)){
+						el.types.remove(o.type);
+						iCat.foreach(el.events, function(k, v){
+							if(k.indexOf(o.type)!=-1)
+								delete el.events[k];
+						});
+					}
 
-				if(el.types.contains(o.type)){
-					el.types.remove(o.type);
-					iCat.foreach(el.events, function(k, v){
-						if(k.indexOf(o.type)!=-1)
-							delete el.events[k];
-					});
+					//事件为空时去掉
+					if(!el.types.length && iCat.isEmptyObject(el.events)){
+						delete objItem[o.selector];
+					}
 				}
-
-				//事件为空时去掉
-				if(!el.types.length && iCat.isEmptyObject(el.events)){
-					delete objItem[o.selector];
-				}
-			} else if(iCat.isArray(o)){
-				while(o.length){
-					arguments.callee(o[0]);
+			}
+			else if(iCat.isArray(o)){
+				o.forEach(function(item){
+					arguments.callee(item);
 					o.shift();
-				}
+				});
 			}
 		},
 
 		on: function(el, type, handler, pd, sp){
 			if(iCat.isString(el) && /\:dg$/i.test(type)){
 				type = type.replace(/\:dg$/i, '');
-				Event.delegate({selector:el, type:type, callback:handler, preventDefault:pd, stopPropagation:sp});
+				Event.delegate({
+					selector:el, type:type, callback:handler,
+					preventDefault:pd, stopPropagation:sp
+				});
 			} else {
 				Event.bind(el, type, handler);
 			}
@@ -257,6 +260,10 @@
 		}
 	});
 	
+	if(iCat.Shim.Event){//keep Compatible
+		iCat.mix(Event, iCat.Shim.Event);
+	}
+	
 	Event.ready(function(){
 		var touch = {}, touchTimeout,
 			supportTouch = 'ontouchstart' in root;
@@ -266,7 +273,7 @@
 			end_evt = supportTouch ? 'touchend' : 'mouseup',
 			cancel_evt = supportTouch ? 'touchcancel' : 'mouseout';
 
-		var bodyNode = iCat.pageBody = iCat.util.queryOne('*[data-pagerole=body]'),
+		var bodyNode = iCat.el_bodyWrap = iCat.util.queryOne('*[data-pagerole=body]'),
 			Event = iCat.Event, now, delta,
 			longTapDelay = 750, longTapTimeout,
 
@@ -301,12 +308,13 @@
 
 			if(delta>0 && delta<=250) touch.isDoubleTap = true;
 			touch.last = now;
-			Event._execute('hover', touch.el, 0);
+			Event._execute('hover', touch.el, evt, 0);
 
 			longTapTimeout = setTimeout(function(){
 					longTapTimeout = null;
 					if(touch.last){
-						Event._execute('longTap', touch.el);
+						Event._execute('hover', touch.el, evt, 1);
+						Event._execute('longtap', touch.el, evt);
 						touch = {};
 					}
 				}, longTapDelay);
@@ -318,43 +326,48 @@
 			if(evt.button && evt.button===2) return;
 
 			cancelLongTap();
-			var page = supportTouch? evt.touches[0] : evt;
-			touch.x2 = page.pageX;
-			touch.y2 = page.pageY;
-			var distanceX = touch.x2 - touch.x1,
-				distanceY = touch.y2 - touch.y1;
-			if(typeof touch.isScrolling=='undefined'){
-				touch.isScrolling = !!(touch.isScrolling || Math.abs(distanceX)<Math.abs(distanceY));
-			}
-			if(!touch.isScrolling){
-				Event._execute('swiping', touch.el, [touch.x1, touch.x2, touch.y1, touch.y2]);
-			}
+			iCat.util.throttle({
+				callback: function(){
+					var page = supportTouch? evt.touches[0] : evt;
+					touch.x2 = page.pageX;
+					touch.y2 = page.pageY;
+					var distanceX = touch.x2 - touch.x1,
+						distanceY = touch.y2 - touch.y1;
+					if(typeof touch.isScrolling=='undefined'){
+						touch.isScrolling = !!(touch.isScrolling || Math.abs(distanceX)<Math.abs(distanceY));
+					}
+					if(!touch.isScrolling){
+						Event._execute('swiping', touch.el, evt, [touch.x1, touch.x2, touch.y1, touch.y2]);
+					}
+				},
+				mustRunDelay: 200
+			})();
 		});
 
 		// end
 		Event.on(bodyNode, end_evt, function(evt){
 			evt.stopPropagation();
 			if(evt.button && evt.button===2) return;
-			Event._execute('hover', touch.el, 1);
+			Event._execute('hover', touch.el, evt, 1);
 			cancelLongTap();
 			
 			if(!touch.isScrolling){
 				if(touch.isDoubleTap){// double tap (tapped twice within 250ms)
-					Event._execute('doubleTap', touch.el);
+					Event._execute('dbltap', touch.el, evt);
 					touch = {};
 				} else if('last' in touch){
 					if((touch.x2&&Math.abs(touch.x1-touch.x2)<20) || (touch.y2&&Math.abs(touch.y1-touch.y2)<20)){
-						Event._execute('tap', touch.el);
+						Event._execute('tap', touch.el, evt);
 					}
 
 					touchTimeout = setTimeout(function(){
 						touchTimeout = null;
-						Event._execute('singleTap', touch.el);
+						Event._execute('singletap', touch.el, evt);
 						touch = {};
 					}, 250);
 				} else if((touch.x2&&Math.abs(touch.x1-touch.x2)>30) || (touch.y2&&Math.abs(touch.y1-touch.y2)>30)){
 					var swipe = 'swipe' + swipeDirection(touch.x1, touch.x2, touch.y1, touch.y2);
-					Event._execute(swipe, touch.el);
+					Event._execute(swipe, touch.el, evt);
 					touch = {};
 				}
 			} else {
@@ -369,20 +382,6 @@
 			if(longTapTimeout) clearTimeout(longTapTimeout);
 			longTapTimeout = touchTimeout = null;
 			touch = {};
-		});
-
-		// Stops the default click event
-		Event.on(bodyNode, 'click', function(evt){
-			var el = iCat.util.parentIfText(evt.target);
-			if(!el || el==doc.body) return;
-
-			iCat.util.bubble(el, function(node, ret){
-				ret = iCat.util.matches(node, Event.__event_selectors);
-				if(iCat.isNumber(ret)){
-					evt.preventDefault();
-					//evt.stopPropagation();
-				}
-			});
 		});
 	});
 })(ICAT, this, document);
