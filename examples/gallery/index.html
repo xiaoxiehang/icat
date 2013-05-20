@@ -1,0 +1,70 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <title>Multi-Level Backbone Image Gallery</title>
+        <link rel="stylesheet" href="gallery.css" type="text/css" media="screen" charset="utf-8" />
+        <link rel="stylesheet" href="shadows.css" type="text/css" media="screen" charset="utf-8" />
+		    <link rel="stylesheet" href="buttons.css" type="text/css" media="screen" charset="utf-8" />
+        <script type="text/javascript" src="http://assets.3gtest.gionee.com/sys/icat/1.1.5/icat.source.js"></script>
+        <script type="text/javascript" src="js/main.source.js"></script>
+
+        <script id="indexTmpl" type="text/x-jquery-tmpl">
+        <%for(var i=0, len=_self.length; i<len; i++){%>
+        <div class="item drop-shadow round">
+         <div class="item-image">
+             <a href="#subalbum/c<%=_self[i].pid%>"><img src="<%=_self[i].image%>" alt="<%=_self[i].title%>" /></a>
+         </div>
+         <div class="item-artist"><%=_self[i].artist%></div>
+          <div class="item-title"><%=_self[i].title%></div>
+          <div class="item-years"><%=_self[i].years%></div>
+        </div>
+        <%}%>
+        </script>
+				
+			
+				<script id="subindexTmpl" type="text/x-jquery-tmpl">
+        <%for(var i=0, len=data.length; i<len; i++){%>
+        <div class="item  drop-shadow round">
+         <div class="item-image subalbum">
+             <a href="#subalbum/c<%=_self.cid%>/<%=data[i].pid%>"><img src="<%=data[i].image%>" alt="<%=data[i].title%>" alt="No images in this folder"/></a> 
+         </div>
+         <div class="item-artist"><%=data[i].artist%></div>
+          <div class="item-title"><%=data[i].title%></div>
+          <div class="item-price"><%=data[i].price%></div>
+        </div>
+        <%}%>
+        </script>
+				
+     
+        <script id="itemTmpl" type="text/x-jquery-tmpl">
+        <div class="item-detail">
+          <div class="item-image drop-shadow round"><img src="<%=_self.large_image%>" alt="<%=_self.title%>" /></div>
+          <div class="item-info">
+            <div class="item-artist"><%=_self.artist%></div>
+            <div class="item-title"><%=_self.title%></div>
+            <div class="item-price">$<%=_self.price%></div>
+            <br />
+            <div class="item-link"><a href="<%=_self.url%>" class="button">Buy this item</a></div>
+            <div class="back-link"><a href="#" class="button">&laquo; Back to Albums</a></div>
+          </div>
+        </div>
+        </script>
+    </head>
+    
+    <body data-pagerole="body">
+        <div id="container">
+            <div id="header">
+                <h1>
+                    <a href="index.php">Multi-Level Backbone Gallery</a>
+                </h1>
+                <h3>Created by Addy Osmani for 'Building Single-page Apps With jQuery's Best Friends'</h3>
+            </div>
+
+            <div id="main"></div>
+        </div>
+    </body>
+</html>
