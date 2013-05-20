@@ -85,16 +85,8 @@
 					k = k.replace(/\D+@/g, '');
 					if(/^\d+@/.test(k)){
 						k = k.split('@');
-						if(/\{.*?\}/.test(k[1])){
-							var s = k[1].replace(/\{(.*?)\}\s*/, '$1|').split('|'),
-								items = apSlice.call(o.querySelectorAll(s[1]));
-							items.forEach(function(item){
-								joinHook(hooks, item.querySelectorAll(s[0])[k[0]]);
-							});
-						} else {
-							var node = o.querySelectorAll(k[1])[k[0]];
-							joinHook(hooks, node);
-						}
+						var node = o.querySelectorAll(k[1])[k[0]];
+						joinHook(hooks, node);
 					} else {
 						var nodes = apSlice.call(o.querySelectorAll(k));
 						nodes.forEach(function(node){
@@ -109,23 +101,22 @@
 			}
 			o = null;
 
-			this.getData = function(format){
-				format = format || 'string';
-				var jsonFormat = /json/i.test(format),
-					argus = jsonFormat? {} : '',
-					_getData = function(form){
-						if(!form) return;
-						apSlice.call(form.elements).forEach(function(el){
-							var key = el.getAttribute('name'), value = el.value;
-							if(key){
-								jsonFormat?
-									argus[key] = value : argus += '&' + key + '=' + value;
-							}
-						});
-						return jsonFormat? argus : argus.replace(/^&/, '');
-					};
-				
-				return _getData(/form/i.test(parentNode.tagName)? parentNode : parentNode.querySelector('form'));
+			var form = /form/i.test(parentNode.tagName)? parentNode : parentNode.querySelector('form');
+			if(form){
+				this.getData = function(format){
+					format = format || 'string';
+					var jsonFormat = /json/i.test(format),
+						argus = jsonFormat? {} : '';
+
+					apSlice.call(form.elements).forEach(function(el){
+						var key = el.getAttribute('name'), value = el.value;
+						if(key){
+							jsonFormat?
+								argus[key] = value : argus += '&' + key + '=' + value;
+						}
+					});
+					return jsonFormat? argus : argus.replace(/^&/, '');
+				}
 			}
 		},
 
@@ -149,10 +140,15 @@
 	 * - 按需存取数据
 	 * - 扩展实例化后对象的方法
 	 */
-	function Model(module){
+	function Model(module, events){
 		this.mID = module;
+		this.events = events;
 	}
 	Model.prototype = {
+		setEvents: function(){},
+		addEvents: function(){},
+		envelopData: function(){},
+		storeData: function(){},
 		extend: function(o){
 			iCat.mix(this, o);
 		}

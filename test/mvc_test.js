@@ -20,8 +20,8 @@
 			parentWrap:'#qunit-tests',
 			hooks:{
 				'1@li': ['#J_todo', '.J_slide', 'pageNum~1'],
-				'0@li span.desc': '.J_me',//span.desc集合中的第一个
-				'0@{li} span.desc': 'data-ajaxUrl~http://www.gionee.com',//每个item中第一个span.desc
+				'li:nth-child(1) span.desc': '.J_me',//span.desc集合中的第一个
+				'li span.desc': 'data-ajaxUrl~http://www.gionee.com',//每个item中第一个span.desc
 				'li b': ['data-ajaxUrl~http://www.baidu.com', 'pageNum~1', 'hasnext~false']
 			},
 			data:[

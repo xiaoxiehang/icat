@@ -28,4 +28,4 @@ home.on('.pass', 'click', function(){alert(this.className);})
 	.off('.pass', 'click');*/
 
 //Event.setCurrent();//iCat.__OBSERVER_PAGEID = undefined | '' | '__PAGE_EVENT';
-//iCat.log(iCat);
+iCat.log(iCat);

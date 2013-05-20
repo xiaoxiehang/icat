@@ -280,6 +280,7 @@
 
 			// start
 			Event.bindEvent(bodyNode, start_evt, function(evt){
+				if(evt.button===2) return;
 				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID],
 					page = supportTouch? evt.touches[0] : evt;
 				now = Date.now();
@@ -325,6 +326,7 @@
 			// end
 			Event.bindEvent(bodyNode, end_evt, function(evt){
 				cancelLongTap();
+				if(evt.button===2) return;
 				var objObs = iCat.obsCreate[iCat.__OBSERVER_PAGEID];
 
 				if(!touch.isScrolling){
