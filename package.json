@@ -1,12 +1,12 @@
 {
   "name": "icat",
-  "description": "It Concise,Agile,Thin...",
+  "description": "It's Concise,Agile,Thin...",
   "version": "0.1.0",
   "homepage": "https://github.com/valleykid/icat",
   "author": {
     "name": "valleykid",
     "email": "valleykiddy@gmail.com",
-    "url": "www.jndream.net/vkblog"
+    "url": ""
   },
   "repository": {
     "type": "git",
