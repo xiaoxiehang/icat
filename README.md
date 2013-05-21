@@ -6,6 +6,16 @@ It's Concise,Agile,Thin...
 
 官网地址：[http://demo.3gtest.gionee.com/vkicat/index.php](http://demo.3gtest.gionee.com/vkicat/index.php)。
 
+她的主要功能点:
+- 优化代码组织，用app、namespace、Class、widget、util等方法；
+- 优化event模型，用模拟事件的方式架构代理；
+- 优化mvc模型，view模板可以随意添加hooks，模块化加载，获取或存储数据只需配置下即可；
+- 优化js动态加载，路径灵活方便，include、require、use等方法各有各的使用场景。
+
+她的使用场景：
+- 移动端开发，页面只需显式加载她和[main.js](https://github.com/valleykid/icat/blob/master/examples/gallery/js/main.source.js)，然后动态加载其他各种js即可。
+- pc端开发，页面需要多加载一个shim插件来兼容各种浏览器，ie下因为不支持createTreeWalker，添加hooks功能会失效。
+
 ## Getting Started
 _(Coming soon)_
 
