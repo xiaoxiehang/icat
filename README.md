@@ -4,6 +4,8 @@ ICAT是由[@jndream](http://weibo.com/jndream)发起创建的一个开源JS袖�
 
 It's Concise,Agile,Thin...
 
+ICAT = kissy(part) + Event + (underscore&backbone) + seajs
+
 官网地址：[http://demo.3gtest.gionee.com/vkicat/index.php](http://demo.3gtest.gionee.com/vkicat/index.php)。
 
 她的主要功能点:
@@ -17,7 +19,9 @@ It's Concise,Agile,Thin...
 - pc端开发，页面需要多加载一个shim插件来兼容各种浏览器，ie下因为不支持createTreeWalker，添加hooks功能会失效。
 
 ## Getting Started
-_(Coming soon)_
+- demo1: [http://demo.3gtest.gionee.com/vkicat/todo/index.html](http://demo.3gtest.gionee.com/vkicat/todo/index.html) ([对比backbone](http://backbonejs.org/examples/todos/index.html))
+- demo2: [http://demo.3gtest.gionee.com/vkicat/gallery/index.html](http://demo.3gtest.gionee.com/vkicat/gallery/index.html) ([对比backbone](http://addyosmani.com/resources/backbonegallery/index.php))
+- demo3: [http://demo.3gtest.gionee.com/vkicat/icatapp/index.html](http://demo.3gtest.gionee.com/vkicat/icatapp/index.html)
 
 ## Documentation
 _(Coming soon)_

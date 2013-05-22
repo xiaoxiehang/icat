@@ -149,7 +149,7 @@
 			c.init({
 				view:new mainView('mView'),
 				model:mainModel,
-				baseWrap: '#todoapp'
+				baseBed: '#todoapp'
 			});
 
 			c.vmAdd({view:new appView('aView')});

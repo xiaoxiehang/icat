@@ -1,0 +1,36 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>AwesomeSite</title>
+    <link href="styles/Css-reset.css" rel="stylesheet" type="text/css" />
+    <link href="styles/Backboneapp.css" rel="stylesheet" type="text/css" />
+
+    <script src="http://assets.3gtest.gionee.com/sys/icat/1.1.5/icat.source.js" type="text/javascript"></script>
+    <script src="scripts/main.source.js" type="text/javascript"></script>
+
+    <script type="text/template" id="item-tmpl">
+    <%for(var i=0, len=_self.length; i<len; i++){%>
+        <div class="menu-item" id="item<%=_self[i].position%>">
+            <%if(_self[i].title != ""){%>
+                <a href="#info/<%=_self[i].position%>" class="title"><%=_self[i].title%></a>
+            <%}%>
+        </div>
+    <%}%>
+    </script>
+    <script type="text/template" id="content-tmpl">
+        <div class="content" id="item<%=_self.position%>">
+            <%=_self.content%>
+        </div>
+    </script>
+</head>
+
+<body data-pagerole="body">
+<div id="content">
+    <div id="backbone-menu"></div>
+    <div id="backbone-content"></div>
+</div>
+</body>
+</html>

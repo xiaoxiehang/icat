@@ -1,11 +1,13 @@
 (function(iCat){
 	function switchPage(p1, p2){
-		if(p1){
+		p1 && $(p1).hide();
+		$(p2).show();
+		/*if(p1){
 			$(p2).hide();
 			$(p1).fadeOut(500, function(){
 				$(p2).slideDown(500);
 			});
-		}
+		}*/
 	}
 
 	//view
@@ -13,17 +15,43 @@
 		config: {
 			wrap: '',
 			repeatOverwrite: true,
-			ajaxUrl: 'data/album.php'
+			ajaxUrl:'data/album.php',
+			globalKey:'pageData'
 		}
 	});
 
 	//model
-	var mainModel = iCat.Model.extend();
+	var mainModel = iCat.Model.extend({
+		DataOutput: function(d, a, b){
+			if(!a) return d;
+
+			var _data = {};
+			if(!b){
+				d.forEach(function(v){
+					if(v.pid==a){
+						_data.data = v.subalbum;
+					}
+				});
+				_data.cid = a;
+			} else {
+				d.forEach(function(v){
+					if(v.pid==a){
+						v.subalbum.forEach(function(item){
+							if(item.pid==b){
+								_data = item;
+							}
+						});
+					}
+				});
+			}
+			return _data;
+		}
+	});
 
 	//controller
 	var mainCtrl = iCat.Controller.extend({
 		config: {
-			baseWrap: '#main .jstest',
+			baseBed: '#main .jstest',
 			adjustLayout: {'#main':'div.jstest*3'}
 		},
 
@@ -43,48 +71,21 @@
 		},
 
 		albumInit: function(){
-			var c = this;
+			var c = this,
+				aId = c.hashArgus[1];
 			c.init({
-				view: new View('uv', {config: {tempId:'subindexTmpl'}}),
+				view: new View('uv', {config: {tempId:'subindexTmpl', globalArgus:[aId]}}),
 				model: mainModel,
-				setAjax: [$.ajax, {
-					success: function(data){
-						var aId = c.hashArgus[1],
-							albumData = {};
-						data.forEach(function(v){
-							if(v.pid==aId){
-								albumData.data = v.subalbum;
-							}
-						});
-						albumData.cid = aId;
-						return albumData;
-					}
-				}],
 				switchPage: switchPage
 			});
 		},
 
 		detailInit: function(){
-			var c = this;
+			var c = this,
+				aId = c.hashArgus[1], dId = c.hashArgus[2] || 0;
 			c.init({
-				view: new View('dv', {config: {tempId:'itemTmpl'}}),
+				view: new View('dv', {config: {tempId:'itemTmpl', globalArgus:[aId, dId]}}),
 				model: mainModel,
-				setAjax: [$.ajax, {
-					success: function(data){
-						var aId = c.hashArgus[1], dId = c.hashArgus[2] || 0,
-							detaiData = {};
-						data.forEach(function(v){
-							if(v.pid==aId){
-								v.subalbum.forEach(function(item){
-									if(item.pid==dId){
-										detaiData = item;
-									}
-								});
-							}
-						});
-						return detaiData;
-					}
-				}],
 				switchPage: switchPage
 			});
 		}
