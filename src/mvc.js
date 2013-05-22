@@ -50,7 +50,7 @@
 				curWrap = iCat.util.queryOne(curCfg.wrap || curCfg.scrollWrap, iCat.el_curWrap);
 			
 			if(self.model._dataChange(vid, data) ||//数据发生变化
-				iCat.singleWrap ||//单层切换
+				iCat.singleMode ||//单层切换
 					!iCat.util.queryAll('*[data-unclass='+self.viewId+'-loaded]', curWrap).length){//对应子元素为空(fixed bug: 同init函数不同hash无法渲染)
 				if(data.Drepeat){
 					data.Drepeat.forEach(function(d, i){
@@ -72,6 +72,11 @@
 
 			if(!data && self.model){
 				self.model.fetch(cfg, function(servData){
+					if(cfg.globalKey && self.model.DataOutput){
+						cfg.globalArgus = cfg.globalArgus || [];
+						cfg.globalArgus.unshift(servData);
+						servData = self.model.DataOutput.apply(self, cfg.globalArgus);
+					}
 					self._render(servData, before, clear);
 				});
 			} else if(data) {
@@ -82,13 +87,13 @@
 				self.init(self, self.model);
 		},
 
-		setModel: function(m, before, clear){
+		setModel: function(m, data, before, clear){
 			var self = this;
 			if(!m || (iCat.isObject(m) && m.constructor.__super__!==Model))
 				m = iCat.Model['__page_emptyModel'] || new Model('__page_emptyModel');
 			if(!self.model){
 				self.model = m;
-				self._htmlRender(null, before, clear);
+				self._htmlRender(data, before, clear);
 			} else {
 				self.model = m;
 			}
@@ -183,9 +188,9 @@
 
 			//全局调整结构
 			if(cfg.adjustLayout){
-				if(iCat.isString(cfg.adjustLayout) && cfg.baseWrap){
+				if(iCat.isString(cfg.adjustLayout) && cfg.baseBed){
 					var wraps = iCat.toArray(
-						iCat.util.queryAll(cfg.baseWrap)
+						iCat.util.queryAll(cfg.baseBed)
 					);
 					wraps.forEach(function(w){
 						iCat.util.makeHtml(cfg.adjustLayout, w);
@@ -201,6 +206,7 @@
 				root['onhashchange'] = function(){
 					var hash = iCat.util.dealHash(location.hash, self.routes);
 					self.hashArgus = hash;
+					self.pseudoInit = true;
 					try{ self.routes[hash[0]].call(self); } catch(e){}
 				};
 			}
@@ -223,7 +229,7 @@
 			// clear
 			self.modsLoad_mode = false;
 			if(iCat.el_curWrap){
-				iCat.util.addClass(iCat.el_curWrap, '__prev_page');
+				iCat.util.addClass(iCat.el_curWrap, '__prev_baseBed');
 				iCat.util.removeClass(iCat.el_curWrap, curCla);
 				iCat.el_curWrap = null;
 			}
@@ -237,13 +243,13 @@
 			}
 
 			// get informs
-			if(o.baseWrap){
-				curWrap = iCat.el_curWrap = iCat.util.queryOne(o.baseWrap);
+			if(o.baseBed){
+				curWrap = iCat.el_curWrap = iCat.util.queryOne(o.baseBed);
 				iCat.util.addClass(curWrap, curCla);
-				delete o.baseWrap;
+				delete o.baseBed;
 			}
-			else if(cfg.baseWrap){
-				var wraps = iCat.util.queryAll(cfg.baseWrap);
+			else if(cfg.baseBed){
+				var wraps = iCat.util.queryAll(cfg.baseBed);
 				if(wraps.length && !self.wraps.contains(curPid)){
 					curWrap = iCat.el_curWrap = wraps[self.wraps.length];
 					self.wraps.push(curPid);
@@ -254,27 +260,25 @@
 			}
 			
 			if(!iCat.el_curWrap) {
-				curWrap = iCat.util.queryOne(o.singleWrap || cfg.singleWrap) || doc.getElementById('J_agentBaseWrap');
+				curWrap = iCat.util.queryOne(o.singleBed || cfg.singleBed) || doc.getElementById('__agent_baseBed');
 				if(!curWrap){
 					var w = doc.createElement('div');
-					w.id = 'J_agentBaseWrap';
+					w.id = '__agent_baseBed';
 					iCat.el_bodyWrap.insertBefore(w, iCat.el_bodyWrap.firstChild);
-					iCat.el_curWrap = curWrap = doc.getElementById('J_agentBaseWrap');
+					iCat.el_curWrap = curWrap = doc.getElementById('__agent_baseBed');
 				} else {
 					iCat.el_curWrap = curWrap;
 				}
-				iCat.singleWrap = true;
+				iCat.singleMode = true;
 			}
 
-			page1 = iCat.util.queryOne('.__prev_page');
+			page1 = iCat.util.queryOne('.__prev_baseBed');
 			page2 = iCat.el_curWrap;
-			if(o.switchPage){
-				o.switchPage(page1, page2);
-				if(page1) iCat.util.removeClass(page1, '__prev_page');
-			}
+			if(o.switchPage) o.switchPage(page1, page2);
+			if(page1) iCat.util.removeClass(page1, '__prev_baseBed');
 
 			if(o.adjustLayout){
-				iCat.util.makeHtml(o.adjustLayout, curWrap, iCat.singleWrap);
+				iCat.util.makeHtml(o.adjustLayout, curWrap, iCat.singleMode);
 				delete o.adjustLayout;
 			}
 
@@ -284,10 +288,18 @@
 				delete o.modules;
 			}
 
+			if(o.vmGroups) o = o.vmGroups;
+
 			// page render
 			self.vmClear();
 			self.vmAdd(o, true);
 			self.modsLoad_mode? self._modsLoad() : self._commLoad();
+			delete o;
+
+			if(self.pseudoInit){//伪初始化需重新激活
+				iCat.ctrlAble(self);
+				delete self.pseudoInit;
+			}
 		},
 
 		// type: 0=common, 1=height-load, 2=scroll-load
@@ -378,18 +390,18 @@
 			});
 		},
 
-		_subscribe: function(events){//events参数同Event.delegate
+		_subscribe: function(events, disabled){//events参数同Event.delegate
 			var self = this;
 			iCat.util.recurse(events, function(o){
-				Event.delegate(o, true);
+				o.selector = o.selector.trim().replace(/\s+/g, ' ');
+				Event.delegate(o, disabled);
 				if(!self.selectors.contains(o.selector)){
 					self.selectors.push(o.selector);
-					Event.__event_selectors.push(o.selector);
 				}
 			});
 		},
 
-		_regEvents: function(view){// bind-events
+		_regEvents: function(view, disabled){// bind-events
 			var self = this,
 				vid = view.viewId,
 				events = iCat.Model.__pageData[vid].config.events;
@@ -403,13 +415,14 @@
 							argus.unshift(view, view.model, iCat.Model.__pageData[view.viewId].config);//普通方法追加view, model, config
 						fn.apply(this, argus);
 					};
-					self._subscribe(e);
+					self._subscribe(e, disabled);
 				});
 			}
 		},
 
 		vmAdd: function(vm, init){
-			if(!vm || !iCat.isObject(vm)) return;
+			if(!vm) return;
+			vm = iCat.isArray(vm)? vm : [vm];
 
 			var self = this,
 				vmGroups = self.vmGroups;
@@ -452,7 +465,7 @@
 
 							if(setItem.config.scrollWrap || self.config.scrollWrap)
 								self.routes.scrollWrap = self.config.scrollWrap || setItem.config.scrollWrap;
-							self._regEvents(curView);
+							self._regEvents(curView, init);
 						}
 					);
 				} else {
@@ -475,7 +488,7 @@
 							vmGroups[key] = item.model.modelId;
 						}
 					}
-					self._regEvents(curView);
+					self._regEvents(curView, init);
 				}
 			});
 		},
@@ -506,7 +519,8 @@
 			}
 		},
 
-		vmClear: function(){ this.vmRemove(this.vmGroups); }
+		vmClear: function(){ this.vmRemove(this.vmGroups); },
+		gotopage: function(url){ location.href = iCat.util.fullUrl(url); }
 	};
 
 	// 对外接口
@@ -531,6 +545,12 @@
 				ret = !iCat.util.jsonCompare(d, oldData);
 			iCat.Model.__pageData[vid].prevData = JSON.stringify(d);
 			return ret;
+		},
+
+		GlobalData: function(key, d){
+			var GD = iCat.Model.__globalData = iCat.Model.__globalData || {};
+			if(!d) return GD[key];
+			if(!GD[key]) GD[key] = d;
 		}
 	});
 
@@ -540,6 +560,7 @@
 			arrCtrl = iCat.isArray(arrCtrl) ? arrCtrl : [arrCtrl];
 			arrCtrl.forEach(function(item){
 				Event.__event_selectors = Event.__event_selectors.concat(item.selectors);
+				Event.__event_selectors.unique();
 			});
 			if(callback && iCat.isFunction(callback)){
 				callback();

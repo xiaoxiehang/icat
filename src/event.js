@@ -106,8 +106,8 @@
 				} else el = el.get(0);
 			}
 
-			if(/\:dg$/i.test(type)){// 事件代理
-				type = type.replace(/\:dg$/i, '');
+			if(/^@\w+/i.test(type)){// 事件代理
+				type = type.replace(/^@/i, '');
 				el = iCat.util.queryOne(el);
 				Event._execute(type, el);
 			}  else { // 普通元素
@@ -172,6 +172,7 @@
 					}, 500, 10);
 				}
 				else {
+					o.selector = o.selector.trim().replace(/\s+/g, ' ');
 					if(!arrSele.contains(o.selector) && !disabled) arrSele.push(o.selector);
 					var el = objItem[o.selector] = objItem[o.selector] || {},
 						key = o.type + '|' + (o.preventDefault? 1:0) + '|' + (o.stopPropagation? 1:0);
@@ -212,6 +213,7 @@
 				if(/blur|focus|load|unload|change/i.test(o.type)){
 					Event.off(iCat.util.queryAll(o.selector), o.type);
 				} else {
+					o.selector = o.selector.trim().replace(/\s+/g, ' ');
 					if(!arrSele.contains(o.selector) || !objItem[o.selector]) return;
 					arrSele.remove(o.selector);
 					var el = objItem[o.selector];
@@ -239,8 +241,8 @@
 		},
 
 		on: function(el, type, handler, pd, sp){
-			if(iCat.isString(el) && /\:dg$/i.test(type)){
-				type = type.replace(/\:dg$/i, '');
+			if(iCat.isString(el) && /^@\w+/i.test(type)){
+				type = type.replace(/^@/i, '');
 				Event.delegate({
 					selector:el, type:type, callback:handler,
 					preventDefault:pd, stopPropagation:sp
@@ -251,8 +253,8 @@
 		},
 
 		off: function(el, type){
-			if(iCat.isString(el) && /\:dg$/i.test(type)){
-				type = type.replace(/\:dg$/i, '');
+			if(iCat.isString(el) && /^@\w+/i.test(type)){
+				type = type.replace(/^@/i, '');
 				Event.undelegate({selector:el, type:type});
 			} else {
 				Event.unbind(el, type);
@@ -288,7 +290,10 @@
 				return xDelta >= yDelta ? (x1 - x2 > 0 ? 'Left' : 'Right') : (y1 - y2 > 0 ? 'Up' : 'Down');
 			};
 
-		if(!bodyNode) return;
+		if(!bodyNode){
+			iCat.el_bodyWrap = doc.body;
+			return;
+		}
 
 		// start
 		Event.on(bodyNode, start_evt, function(evt){

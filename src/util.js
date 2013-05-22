@@ -335,7 +335,7 @@
 		},
 
 		queryOne: Sutil.queryOne || function(s, el){
-			if(!s) return;
+			if(!s) return el;
 
 			if(iCat.isString(s)){
 				s = /\:[\d]+/.test(s)?
@@ -346,7 +346,7 @@
 		},
 
 		queryAll: Sutil.queryAll || function(selector, el){
-			if(!selector) return;
+			if(!selector) return el;
 			return iCat.isString(selector)?
 					(el || iCat.el_bodyWrap || doc).querySelectorAll(selector) : selector;
 		},
@@ -581,10 +581,15 @@
 
 			if(cfg && data){
 				var baseWrap = iCat.el_curWrap,
-					w = cfg.wrap || cfg.scrollWrap,
-					pWrap = w? iCat.util.queryOne(w, baseWrap) : baseWrap,
-					o = doc.createElement('wrap'),
-					uncla = cfg.viewId + '-loaded',
+					w = cfg.scrollWrap || cfg.wrap,
+					pWrap;
+				if(w!==undefined){
+					pWrap = iCat.util.queryOne(w, baseWrap);
+					if(iCat.isjQueryObject(pWrap)) pWrap = pWrap[0];
+				} else return;
+
+				var	o = doc.createElement('wrap'),
+					uncla = (cfg.viewId || 'layer') + '-loaded',
 					oldNodes = iCat.toArray(
 						iCat.util.queryAll('*[data-unclass='+uncla+']', pWrap)
 					),
@@ -625,7 +630,7 @@
 			
 			//辞旧
 			if(cfg.oneChild===undefined) cfg.oneChild = true;
-			if(clear || (iCat.singleWrap && cfg.oneChild)){
+			if(clear || (iCat.singleMode && cfg.oneChild)){
 				var nodes = pWrap.childNodes;
 				while(nodes.length){
 					pWrap.removeChild(nodes[0]);
@@ -659,7 +664,7 @@
 			o = null;
 
 			// 回调函数
-			if(cfg.callback) cfg.callback(pWrap);
+			if(cfg.callback) cfg.callback(pWrap, cfg);
 
 			// 包含表单
 			var form = /form/i.test(pWrap.tagName) ?
@@ -681,29 +686,56 @@
 				}
 		},
 
-		fetch: function(cfg, callback, onLine){
+		fetch: function(cfg, callback, onLine, execAjax){
 			if(!cfg || !iCat.isObject(cfg)) return;
 
 			var fn = arguments.callee, keyStorage,
-				ownData = iCat.Model.__pageData[cfg.viewId].ownData;
+				IMData = cfg.viewId? iCat.Model.__pageData[cfg.viewId] : {},
+				ownData = IMData.ownData,
+				isFirst = cfg.globalKey && iCat.__cache_timers[cfg.globalKey]===undefined,
+				hasGD = cfg.globalKey && iCat.__cache_timers[cfg.globalKey]!==undefined;
 
 			if(onLine===undefined) onLine = true;
-			   onLine = onLine && true;//navigator.onLine==true;
+			   onLine = onLine && navigator.onLine==true;
 			if(cfg.isSave){
 				cfg.key = cfg.key || '';
 				keyStorage = cfg.viewId + cfg.key;
 			}
 
-			if(onLine && cfg.ajaxUrl){//ajax取数据
+			if(hasGD && !execAjax){//一次会话中全局数据
+				iCat.util.wait(function(k, t){
+					var gData = iCat.Model.GlobalData(cfg.globalKey);
+					if(!gData){
+						iCat.__cache_timers[k] = false;
+						return;
+					}
+					delete iCat.__cache_timers[k];
+
+					iCat.mix(gData, ownData);
+					if(callback && iCat.isFunction(callback)){
+						callback(gData);
+					}
+				}, undefined, 10);
+				return;
+			}
+
+			if(isFirst){
+				iCat.__cache_timers[cfg.globalKey] = false;
+				fn(cfg, callback, true, true);
+			}
+			else if(onLine && cfg.ajaxUrl){//ajax取数据
 				if(!iCat.util.ajax)
 					iCat.$ && iCat.rentAjax(iCat.$.ajax);
 				iCat.util.ajax({
-						type: 'POST', timeout:10000,
-						url: iCat.util.fullUrl(cfg.ajaxUrl, true),
-						cache: false
-					},
-					function(data){
+					type: 'POST', timeout:10000,
+					url: iCat.util.fullUrl(cfg.ajaxUrl, true),
+					cache: false,
+					success: function(data){
 						var _data = JSON.stringify(data);
+						if(cfg.globalKey){
+							iCat.__cache_timers[cfg.globalKey] = true;
+							iCat.Model.GlobalData(cfg.globalKey, data);
+						}
 						iCat.mix(data, ownData);
 						if(keyStorage)
 							iCat.util.save(keyStorage, _data, cfg.repeatOverwrite);
@@ -711,9 +743,10 @@
 							callback(data);
 						}
 					},
-					function(){ fn(cfg, callback, false); }
-				);
-			} else {//本地取数据
+					error: function(){ fn(cfg, callback, false); }
+				});
+			}
+			else {//本地取数据
 				var arr,
 					data = keyStorage?
 						(iCat.util.storage(keyStorage) || iCat.util.storage(keyStorage+'Repeat')) : {};
@@ -809,8 +842,9 @@
 			url = url.replace(/^\//g, '');
 
 			if(iCat.DemoMode && url!=='' && !isUrl){
-				if(url.indexOf('.')<0)
-					url = url.indexOf('?')<0? (url+'.php') : url.replace(/(\?)/g, '.php$1');
+				url = /[\?#]/.test(url)?
+					url.replace(/(\/\w+)([\?#])/g, '$1.php$2') :
+						/(\.\w+)$/.test(url)? url : url.replace(/([^\.]\w+)$/g, '$1.php');
 			}
 			if(!isAjax && bi){
 				url = url + (url.indexOf('?')<0? '?':'&') + bi.replace(/[\?&]+/g, '');

@@ -6,7 +6,7 @@
  * Licensed under the MIT license.
  *
  * @Author valleykiddy@gmail.com
- * @Time 2013-04-27 18:00:00
+ * @Time 2013-05-22 16:00:00
  */
 
 /* core.js # */
@@ -211,21 +211,25 @@
 
 		rentAjax: function(fnAjax, cfg){
 			if(!fnAjax || !iCat.isFunction(fnAjax)) return function(){};
-			iCat.util.ajax = function(cfgAjax, success, error){
-				cfgAjax = iCat.mix(cfgAjax, cfg);
-				var _success = cfgAjax.success,
-					_error = cfgAjax.error;
-				cfgAjax.success = function(data){
+			iCat.util.ajax = function(cfgAjax){
+				cfg = cfg || {};
+				var _cfg = iCat.mix({}, cfgAjax, 'success, error');
+					_cfg = iCat.mix(_cfg, cfg, 'success, error', false);
+				_cfg.prevSuccess = cfg.success;
+				_cfg.nextSuccess = cfgAjax.success;
+				_cfg.prevError = cfg.error;
+				_cfg.nextError = cfgAjax.error;
+				_cfg.success = function(data){
 					if(!data) return;
-					data = iCat.isObject(data)? data : JSON.parse(data);
-					var ret = _success? _success(data) : '';
-					success(ret || data);
+					data = iCat.isObject(data) || iCat.isArray(data)? data : JSON.parse(data);
+					var ret = _cfg.prevSuccess? _cfg.prevSuccess(data) : '';
+					if(_cfg.nextSuccess) _cfg.nextSuccess(ret || data);
 				};
-				cfgAjax.error = function(){
-					var ret = _error? _error() : '';
-					error(ret);
+				_cfg.error = function(){
+					var ret = _cfg.prevError? _cfg.prevError() : '';
+					if(_cfg.nextError) _cfg.nextError(ret);
 				};
-				fnAjax(cfgAjax);
+				fnAjax(_cfg);
 			};
 		},
 
