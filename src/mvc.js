@@ -82,17 +82,16 @@
 			} else if(data) {
 				self._render(data, before, clear);
 			}
-
-			if(self.init)//自定义初始化
-				self.init(self, self.model);
 		},
 
 		setModel: function(m, data, before, clear){
 			var self = this;
 			if(!m || (iCat.isObject(m) && m.constructor.__super__!==Model))
 				m = iCat.Model['__page_emptyModel'] || new Model('__page_emptyModel');
-			if(!self.model){
+			if(!self.model){//第一次
 				self.model = m;
+				if(self.init)//自定义初始化
+					data = self.init(self, m, true);
 				self._htmlRender(data, before, clear);
 			} else {
 				self.model = m;
@@ -169,7 +168,8 @@
 		};
 	Controller.prototype = {
 		_init: function(cId, opt, cfg){
-			var self = this;
+			var self = this,
+				bodyId = iCat.el_bodyWrap.getAttribute('id');
 
 			if(!iCat.Controller[cId])//copy
 				iCat.Controller[cId] = self;
@@ -201,8 +201,8 @@
 				}
 			}
 
-			//页面里没有id(值为"")，则为锚点hash
-			if(!iCat.el_bodyWrap.id){
+			//页面里没有id属性，则为锚点hash
+			if(iCat.isNull(bodyId)){
 				root['onhashchange'] = function(){
 					var hash = iCat.util.dealHash(location.hash, self.routes);
 					self.hashArgus = hash;
@@ -222,27 +222,21 @@
 			var self = this,
 				cfg = self.config,
 				argus = self.hashArgus,
-				curWrap, curPid = argus[0],
-				curCla = cfg.currentCla || 'icat-current-wrap',
+				curWrap, curPid = argus[0], curCla = cfg.currentCla || 'icat-current-wrap',
+				singleSele = o.singleBed || cfg.singleBed,
 				page1, page2;
 
 			// clear
 			self.modsLoad_mode = false;
+			if(self.routes.scrollWrap)
+				delete self.routes.scrollWrap;
 			if(iCat.el_curWrap){
 				iCat.util.addClass(iCat.el_curWrap, '__prev_baseBed');
 				iCat.util.removeClass(iCat.el_curWrap, curCla);
 				iCat.el_curWrap = null;
 			}
-			if(self.routes.scrollWrap){
-				delete self.routes.scrollWrap;
-			}
-			if(o.setAjax){
-				iCat.rentAjax(o.setAjax[0], o.setAjax[1]);
-			} else {
-				delete iCat.util.ajax;
-			}
 
-			// get informs
+			// 设置操作层
 			if(o.baseBed){
 				curWrap = iCat.el_curWrap = iCat.util.queryOne(o.baseBed);
 				iCat.util.addClass(curWrap, curCla);
@@ -250,7 +244,15 @@
 			}
 			else if(cfg.baseBed){
 				var wraps = iCat.util.queryAll(cfg.baseBed);
-				if(wraps.length && !self.wraps.contains(curPid)){
+				if(!wraps.length) return;
+				if(!self.wraps.contains(curPid)){
+					if(wraps.length==self.wraps.length){
+						page1 = iCat.util.queryOne('.__prev_baseBed');
+						iCat.util.removeClass(page1, '__prev_baseBed');
+						iCat.util.addClass(page1, curCla);
+						console.log('The beds are not enough.');
+						return;
+					}
 					curWrap = iCat.el_curWrap = wraps[self.wraps.length];
 					self.wraps.push(curPid);
 				} else {
@@ -258,30 +260,44 @@
 				}
 				iCat.util.addClass(curWrap, curCla);
 			}
-			
-			if(!iCat.el_curWrap) {
-				curWrap = iCat.util.queryOne(o.singleBed || cfg.singleBed) || doc.getElementById('__agent_baseBed');
+			else if(singleSele) {// fixed bug:会影响到没有使用mvc的页面
+				iCat.singleMode = true;
+				curWrap = iCat.util.queryOne(singleSele);
 				if(!curWrap){
-					var w = doc.createElement('div');
-					w.id = '__agent_baseBed';
-					iCat.el_bodyWrap.insertBefore(w, iCat.el_bodyWrap.firstChild);
-					iCat.el_curWrap = curWrap = doc.getElementById('__agent_baseBed');
+					var singleHtml = iCat.util.zenCoding('div'+singleSele),
+						w = doc.createElement('wrap'),
+						nodes;
+					w.innerHTML = singleHtml;
+					nodes = w.childNodes;
+					while(nodes.length){
+						iCat.el_bodyWrap.insertBefore(nodes[0], iCat.el_bodyWrap.firstChild);
+					}
+					iCat.el_curWrap = curWrap = iCat.util.queryOne(singleSele);
 				} else {
 					iCat.el_curWrap = curWrap;
 				}
-				iCat.singleMode = true;
+			}
+			else return;
+
+			// 设置外来ajax
+			if(o.setAjax){
+				delete iCat.util.ajax;
+				iCat.rentAjax(o.setAjax[0], o.setAjax[1]);
 			}
 
+			// 操作层切换动画接口
 			page1 = iCat.util.queryOne('.__prev_baseBed');
 			page2 = iCat.el_curWrap;
 			if(o.switchPage) o.switchPage(page1, page2);
 			if(page1) iCat.util.removeClass(page1, '__prev_baseBed');
 
+			// 调整结构
 			if(o.adjustLayout){
 				iCat.util.makeHtml(o.adjustLayout, curWrap, iCat.singleMode);
 				delete o.adjustLayout;
 			}
 
+			// 模块化加载模式
 			if(o.modules){
 				self.pageMods = o.modules.split(/\s*,\s*/);
 				self.modsLoad_mode = !!self.pageMods.length;

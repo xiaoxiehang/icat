@@ -26,7 +26,7 @@
     </section>
 
     <footer>
-      <a id="clear-completed">Clear completed</a>
+      <a class="clear-completed">Clear completed</a>
       <div id="todo-count"></div>
     </footer>
 
@@ -37,10 +37,9 @@
   </div>
 
   <div id="credits">
-    Created by
+    Updated by: <a href="http://weibo.com/jndream">valleykid(Charlie Wang)</a>.
     <br />
-    <a href="http://jgn.me/">J&eacute;r&ocirc;me Gravel-Niquet</a>.
-    <br />Rewritten by: <a href="http://addyosmani.github.com/todomvc">TodoMVC</a>.
+    Original version: <a href="http://localtodos.com/">Backbone Todo</a>.
   </div>
 
   <!-- Templates -->
@@ -57,7 +56,7 @@
 
   <script type="text/template" id="stats-template">
     <% if (done) { %>
-      <a id="clear-completed">Clear <%= done %> completed <%= done == 1 ? 'item' : 'items' %></a>
+      <a class="clear-completed">Clear <%= done %> completed <%= done == 1 ? 'item' : 'items' %></a>
     <% } %>
     <div class="todo-count"><b><%= remaining %></b> <%= remaining == 1 ? 'item' : 'items' %> left</div>
   </script>

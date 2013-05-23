@@ -590,9 +590,7 @@
 
 				var	o = doc.createElement('wrap'),
 					uncla = (cfg.viewId || 'layer') + '-loaded',
-					oldNodes = iCat.toArray(
-						iCat.util.queryAll('*[data-unclass='+uncla+']', pWrap)
-					),
+					oldNodes = iCat.util.queryAll('*[data-unclass='+uncla+']', pWrap),
 					isFirst = !oldNodes.length,
 					curNode, html = '';
 
@@ -643,13 +641,17 @@
 					pWrap.insertBefore(o, pWrap.firstChild) : pWrap.appendChild(o);
 			}
 			else {
-				pWrap.insertBefore(o, oldNodes[0]);
-				for(var i=oldNodes.length-1; i>=0; i--){
-					if(cfg.repeatOverwrite) pWrap.removeChild(oldNodes[i]);
-					else {
-						if(cfg.repeatHide) iCat.util.addClass(oldNodes[i], 'hidden');
-						if(!before){
-							o.insertBefore(oldNodes[i], o.firstChild);
+				if(!pWrap.childNodes.length){
+					pWrap.appendChild(o);
+				} else {
+					pWrap.insertBefore(o, oldNodes[0]);
+					for(var i=oldNodes.length-1; i>=0; i--){
+						if(cfg.repeatOverwrite) pWrap.removeChild(oldNodes[i]);
+						else {
+							if(cfg.repeatHide) iCat.util.addClass(oldNodes[i], 'hidden');
+							if(!before){
+								o.insertBefore(oldNodes[i], o.firstChild);
+							}
 						}
 					}
 				}

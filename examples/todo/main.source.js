@@ -6,7 +6,7 @@
 		};
 	});
 
-	iCat.use('zeptoCore', function(){
+	iCat.include('lib/jquery/jquery.js', function(){
 		iCat.include('./todos.source.js');
 	});
 })(ICAT);

@@ -20,7 +20,7 @@
 				if(evt.keyCode!=13) return;
 				if(!this.value) return;
 				v.setData(
-					m.dealData(this.value, v.viewId, cfg.isSave), true
+					m.addItem(this.value, v.viewId, cfg.isSave, aView = iCat.View['aView']), true
 				);
 				this.value = '';
 			},
@@ -33,6 +33,9 @@
 			clear: function(v, m, cfg, evt){
 				$(this).parents('li').remove();
 				m.remove(this.getAttribute('data-repeatid'));
+
+				var aView = iCat.View['aView'];
+				aView.init(aView, aView.model);
 			},
 
 			edit: function(v, m, cfg){
@@ -47,7 +50,7 @@
 					item = me.siblings('.view'), label = item.find('label');
 				label.html(val);
 				me.blur().hide(); item.show();
-				m.dealData(val, rkey, cfg.isSave);
+				m.updateItem(val, undefined, rkey);
 			}
 		}
 	);
@@ -58,101 +61,128 @@
 				tempId: 'stats-template',
 				wrap: '#todo-count',
 				events: [
-					{selector:'#clear-completed', type:'click!', callback:'clearCompleted', preventDefault:true},
+					{selector:'.clear-completed', type:'click!', callback:'clearCompleted', preventDefault:true},
 					{selector:'#toggle-all', type:'click!', callback:'toggleAllComplete'},
 					{selector:'.toggle', type:'click!', callback:'toggleDone'}
 				]
 			},
 
-			delSelected: [],
-
-			clearCompleted: function(v, m){
-				m.remove(v.delSelected);
-				v.delSelected = [];
-				iCat.View['mView'].update();
-
-				$('#toggle-all')[0].checked = false;
-				$('#todoapp footer').hide();
-			},
-			toggleAllComplete: function(v){
-				var m = iCat.Model['__page_emptyModel'],
-					me = $(this),
-					lis = $('#todo-list li'),
+			init: function(v, m, init){
+				var arr = this.arrChecked = [],
 					ft = $('#todoapp footer'),
-					arr = v.delSelected;
-
-				lis[this.checked? 'addClass' : 'removeClass']('done');
-				iCat.foreach(lis, function(i, el){
-					var rid = el.getAttribute('data-repeatid');
-					!arr.contains(rid) && arr[$(el).hasClass('done')? 'push' : 'remove'](rid);
+					countBar = ft.find('#todo-count'), allDel = countBar.siblings('.clear-completed'),
+					elAll = iCat.util.queryOne('#toggle-all'),
+					maxlen = m.maxLength('mView'), len;
+				m.fetch({viewId:'mView', isSave:true}, function(data){
+					if(!data.Drepeat) return;
+					data.Drepeat.forEach(function(v){
+						if(v.done){
+							$('li[data-repeatid='+v.rkey+']').addClass('done');
+							arr.push(v.rkey);
+						}
+					});
 				});
 
-				if(this.checked){
+				len = arr.length;
+				if(len){
 					ft.show();
-					lis.find('.toggle').attr('checked', 'true');
-					ft.find('#todo-count').hide();
-					ft.find('#clear-completed').show();
-					if(!v.model) v.setModel(m);
+					if(maxlen==len){
+						elAll.checked = true;
+						countBar.hide(); allDel.show();
+					} else {
+						elAll.checked = false;
+						countBar.show(); allDel.hide();
+					}
 				} else {
+					elAll.checked = false;
 					ft.hide();
-					lis.find('.toggle').removeAttr('checked');
 				}
+
+				if(init)
+					return {done:len, remaining:maxlen-len};
+				else {
+					v.setData({done:len, remaining:maxlen-len}, false, true);
+				}
+			},
+
+			clearCompleted: function(v, m){
+				v.arrChecked.forEach(function(item){
+					m.removeItem(item);
+					$('li[data-repeatid='+item+']').remove();
+				});
+				v.init(v, m);
+			},
+			
+			toggleAllComplete: function(v, m){
+				var lis = this.checked?
+						$('#todo-list li:not(.done)') : $('#todo-list .done'),
+					arr = v.arrChecked, isChecked = this.checked;
+
+				iCat.foreach(lis, function(i, el){
+					var me = $(el);
+					isChecked?
+						me.find('.toggle').attr('checked', true) : me.find('.toggle').removeAttr('checked');
+					me[isChecked? 'addClass' : 'removeClass']('done');
+					m.updateItem(undefined, isChecked, me.attr('data-repeatid'), arr);
+				});
+				v.init(v, m);
 			},
 
 			toggleDone: function(v, m){
-				var m = iCat.Model['__page_emptyModel'],
-					me = $(this),
-					pLi = me.parents('li'),
-					ft = $('#todoapp footer'),
-					arr = v.delSelected,
-					maxLen = $('#todo-list li').length,
-					len;
+				var me = $(this),
+					pLi = me.parents('li');
 
 				pLi.toggleClass('done');
-				var rid = pLi.attr('data-repeatid');
-				!arr.contains(rid) && arr[pLi.hasClass('done')? 'push' : 'remove'](rid);
-				len = arr.length;
-				$('#toggle-all')[0].checked = len==maxLen;
-
-				if(len){
-					ft.show();
-					ft.find('#todo-count').show();
-					ft.find('#clear-completed').hide();
-					if(!v.model) v.setModel(m);
-					v.setData({done:len, remaining:maxLen-len}, false, true);
-				} else {
-					ft.hide();
-				}
+				m.updateItem(undefined, this.checked, pLi.attr('data-repeatid'), this.arrChecked);
+				v.init(v, m);
 			}
 		}
 	);
 
 	var mainModel = iCat.Model.extend({
-		dealData: function(val, key, isSave){
+		addItem: function(val, key, isSave, v){
 			var data = {title:val, done:false};
 			if(isSave){
 				/(Repeat)_\d+/.test(key)?
 					this.save(key, data, true) : this.save(key, data);
 			}
+			v.init(v, v.model);
+			data.rkey = iCat.util.storage(key+'Repeat').split(',')[0];
 			return data;
+		},
+
+		updateItem: function(val, done, key){
+			var oldData = JSON.parse( iCat.util.storage(key) || '{}' ),
+				data;
+			val = val===undefined? oldData.title : val;
+			done = done===undefined? oldData.done : done;
+			data = {title:val, done:done};
+			/(Repeat)_\d+/.test(key)?
+				this.save(key, data, true) : this.save(key, data);
+			return data;
+		},
+
+		removeItem: function(key){
+			this.remove(key);
+		},
+
+		maxLength: function(vid){
+			var keys = iCat.util.storage(vid+'Repeat') || '';
+			return keys===''? 0 : keys.split(',').length;
 		}
 	});
 
 	var appCtrl = iCat.Controller.extend(
 	{
-		routes: {
-			'todo': 'todoInit'
-		},
-
+		routes: {'todo': 'todoInit'},
 		todoInit: function(){
 			var c = this;
 			c.init({
-				view:new mainView('mView'),
-				model:mainModel,
+				view:new mainView('mView'), model:mainModel,
 				baseBed: '#todoapp'
 			});
 
-			c.vmAdd({view:new appView('aView')});
+			c.vmAdd({view:new appView('aView'), model:mainModel});
 		}
 	});
 
