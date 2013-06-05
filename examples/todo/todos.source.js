@@ -141,13 +141,14 @@
 
 	var mainModel = iCat.Model.extend({
 		addItem: function(val, key, isSave, v){
-			var data = {title:val, done:false};
+			var data = {title:val, done:false},
+				keys = iCat.util.storage(key+'Repeat');
 			if(isSave){
 				/(Repeat)_\d+/.test(key)?
 					this.save(key, data, true) : this.save(key, data);
 			}
 			v.init(v, v.model);
-			data.rkey = iCat.util.storage(key+'Repeat').split(',')[0];
+			if(keys) data.rkey = keys.split(',')[0];
 			return data;
 		},
 

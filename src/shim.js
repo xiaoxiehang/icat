@@ -21,7 +21,12 @@
 	var arrPro = Array.prototype, apSlice = arrPro.slice,
 		objPro = Object.prototype, toString = objPro.toString,
 		strPro = String.prototype,
-		objType = {'str':'[object String]', 'fun':'[object Function]', 'arr':'[object Array]', 'obj':'[object Object]'};
+		objType = {
+			'str': '[object String]',
+			'fun': '[object Function]',
+			'arr': '[object Array]',
+			'obj': '[object Object]'
+		};
 
 	/*-----------------------------------*
 	 * Array

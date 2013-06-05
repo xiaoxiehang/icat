@@ -2,34 +2,54 @@ var iCat = ICAT;
 
 module('ICAT关键属性和方法');
 
+test('数组常用方法扩展', function(){
+	var arr = [1,2,6,6,5,6];
+	deepEqual(arr.contains(1), true, '是否包含');
+	deepEqual(arr.remove(1), [2,6,6,5,6], '删除元素');
+	//deepEqual(arr.contains(1), true);
+	deepEqual(arr.unique(), [2,6,5], '去重');
+});
+
 test('mix', function(){
-	deepEqual(iCat.mix({},{aaa:2}), {aaa:2});
-	deepEqual(iCat.mix({bbb:"test aaa"}, {aaa:2, bbb:"test bbb"}), {aaa:2, bbb:"test bbb"});
-	deepEqual(iCat.mix({bbb:"test aaa"}, {aaa:2, bbb:"test bbb"}, undefined, false), {aaa:2, bbb:"test bbb"});
+	deepEqual(
+		iCat.mix({},{aaa:2, bbb:'test bbb', ccc:function(){alert('ccc');}}, 'bbb, ccc'),
+		{aaa:2}, '黑名单'
+	);
+	deepEqual(
+		iCat.mix({},{aaa:2, bbb:'test bbb', ccc:'test ccc'}, ['bbb', 'ccc']),
+		{bbb:'test bbb', ccc:'test ccc'}, '白名单'
+	);
+	deepEqual(
+		iCat.mix(
+			{bbb:'test aaa'}, {aaa:2, bbb:'test bbb'}
+		),
+		{aaa:2, bbb:'test bbb'}, '默认覆盖'
+	);
+	deepEqual(
+		iCat.mix({bbb:'test aaa'}, {aaa:2, bbb:'test bbb'}, undefined, false),
+		{aaa:2, bbb:'test aaa'}, '不覆盖'
+	);
 });
 
-test('isDebug', function(){
-	equal(iCat.isDebug, false);
-});
-
-test('browser', function(){
-	iCat.foreach({
-		safari: 'chrome or safari.',
-		opera: 'opera.',
-		msie: 'msie.',
-		mozilla: 'mozilla.'
-	}, function(k, v){
-		equal(iCat.browser[k], true, v);
-	});
+test('Modes', function(){
+	equal(iCat.DebugMode, false, 'It\'s not debug mode');
+	equal(iCat.DemoMode, false, 'It\'s not demo mode');
+	equal(iCat.IPMode, false, 'It\'s not ip mode');
 });
 
 test('is函数', function(){
-	var arrKey = ['Function', 'String', 'Array', 'Object', 'Null'],
-		arrExamp = [iCat.mix, iCat.version, arrKey, iCat, null];
-	
+	var arrKey = ['String', 'Boolean', 'Function', 'Array', 'Object'],
+		arrExamp = [iCat.version, iCat.DebugMode, iCat.mix, arrKey, iCat];
 	iCat.foreach(arrKey, function(i, v){
 		equal(iCat['is'+v](arrExamp[i]), true, v);
 	});
+
+	equal(iCat.isNumber('000'), true, 'number1');
+	//equal(iCat.isNumber('00a'), true, 'number2');
+	equal(iCat.isNumber(01), true, 'number3');
+	equal(iCat.isjQueryObject(document.body), false, 'jQuery object test1.');
+	equal(iCat.isjQueryObject(iCat.$('body')), true, 'jQuery object test2.');
+	equal(iCat.isEmptyObject(iCat.Shim), true, 'Empty object.');
 });
 
 test('Class/widget/util', function(){
@@ -40,7 +60,7 @@ test('Class/widget/util', function(){
 		},
 		
 		getName: function(){
-			iCat.log(this.name);
+			iCat.log('执行getName方法获取的结果：' + this.name);
 		}
 	});
 	
@@ -49,7 +69,7 @@ test('Class/widget/util', function(){
 	//deepEqual(Jim, {name:'Jim', age:23});
 	iCat.log(Jim); Jim.getName();
 	
-	iCat.addWidget('Teacher', {
+	iCat.widget('Teacher', {
 		Create: function(name, age, subject){
 			Person.call(this, name, age);
 			//arguments.callee.prototype = Person.prototype;
@@ -59,18 +79,17 @@ test('Class/widget/util', function(){
 	});
 	
 	/*iCat.foreach(Person.prototype, function(k, v){
-		iCat.Widget.Teacher.prototype[k] = v;
+		iCat.widget.Teacher.prototype[k] = v;
 	});*/
-	iCat.mix(iCat.Widget.Teacher.prototype, Person.prototype);
-	var Tom = new iCat.Widget.Teacher('Tom', 28, 'English');
+	iCat.mix(iCat.widget.Teacher.prototype, Person.prototype);
+	var Tom = new iCat.widget.Teacher('Tom', 28, 'English');
 	Tom.getName();
 
-
-	iCat.addUtil('fnMethod', function(msg){
-		alert(msg);
+	iCat.util('fnMethod', function(msg){
+		iCat.log(msg);
 	});
 
-	iCat.Util.fnMethod('test method');
+	iCat.util.fnMethod('util中fnMethod执行的结果：test method');
 	iCat.log(iCat);
 });
 
@@ -97,4 +116,26 @@ test('app/namespace', function(){
 	});
 	equal(iCat.isString(Able.version), true);
 	equal(iCat.isFunction(Able.testfn), true);
+});
+
+test('rentAjax', function(){
+	equal(iCat.isFunction(iCat.rentAjax), true, '租借其他库的ajax');
+	equal(iCat.isFunction(iCat.util.ajax), false, '尚未设置ajax');
+	
+	iCat.rentAjax(jQuery.ajax, {
+		data: {token:'1234567abcdefg'},
+		success: function(){ iCat.log('全局success，我执行了...'); },
+		error: function(){ iCat.log('发生错误，我执行了...'); }
+	});
+
+	equal(iCat.isFunction(iCat.util.ajax), true, '设置了ajax');
+
+	iCat.util.ajax({
+		url: 'src/abc.php',
+		type: 'POST',//GET
+		success: function(data){
+			iCat.log('自定义success，我也执行了...');
+		},
+		error: function(){}
+	});
 });
