@@ -12,16 +12,31 @@
 	<script type="text/javascript" src="core_test.js"></script>
 </head>
 <body>
-	<h1 id="qunit-header">ICAT core.js</h1>
-	<h2 id="qunit-banner"></h2>
-	<div id="qunit-testrunner-toolbar"></div>
-	
-	<h2 id="qunit-userAgent"></h2>
-	<ol id="qunit-tests"></ol>
-	<div id="qunit-fixture">
-		<span>lame test markup</span>
-		<span>normal test markup</span>
-		<span>awesome test markup</span>
+	<div id="page">
+		<h1 id="qunit-header">ICAT core.js</h1>
+		<h2 id="qunit-banner"></h2>
+		<div id="qunit-testrunner-toolbar"></div>
+		
+		<h2 id="qunit-userAgent"></h2>
+		<div id="test_unwrap"><ol id="qunit-tests"></ol></div>
+		<div id="qunit-fixture">
+			<span>lame test markup</span>
+			<span>normal test markup</span>
+			<span>awesome test markup</span>
+		</div>
+
+		<div id="test_makeHtml">
+			<ul>
+				<li data-unclass="test_temp-loaded">old1</li>
+				<li data-unclass="test_temp-loaded">old2</li>
+				<li data-unclass="test_temp-loaded">old3</li>
+			</ul>
+		</div>
+		<script id="test_temp" type="script/icat-template">
+			<%for(var key in _self){%>
+			<li><%=key%>: <%=_self[key]%></li>
+			<%}%>
+		</script>
 	</div>
 </body>
 </html>

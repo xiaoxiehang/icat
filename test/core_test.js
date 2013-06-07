@@ -90,7 +90,7 @@ test('Class/widget/util', function(){
 	});
 
 	iCat.util.fnMethod('util中fnMethod执行的结果：test method');
-	iCat.log(iCat);
+	//iCat.log(iCat);
 });
 
 test('app/namespace', function(){
@@ -137,5 +137,100 @@ test('rentAjax', function(){
 			iCat.log('自定义success，我也执行了...');
 		},
 		error: function(){}
+	});
+});
+
+test('base-methods', function(){
+	deepEqual(true, true);
+
+	iCat.util.recurse([1,2,3,4,5], function(me){
+		iCat.log(me);
+	});
+
+	iCat.util.bubble(
+		iCat.util.queryOne('input[name="noglobals"]'),
+		function(me){
+			iCat.log(me);
+		}
+	);
+
+	iCat.util.scroll(document, function(bh, bs, ph){
+		console.log(bh, bs, ph);
+		if(bh+bs+10>=ph) iCat.log('小心哈，滑到底部了...');
+	});
+});
+
+test('dom-methods', function(){
+	var elTest = iCat.util.queryOne('#test_makeHtml');
+
+	deepEqual(iCat.util.matches(document, 'html'), false);
+	deepEqual(iCat.util.matches(document.body, 'body'), false);
+	deepEqual(iCat.util.matches(document), false);
+	deepEqual(iCat.util.matches(elTest, '#test_makeHtml'), true);
+
+	iCat.util.addClass(elTest, 'testClass aaa');
+	iCat.util.removeClass(elTest, 'aaa');
+	deepEqual(iCat.util.hasClass(elTest, 'testClass'), true, '元素包含testClass');
+});
+
+test('storage-methods', function(){
+	deepEqual(true, true);
+
+	iCat.util.storage('testKey', 'testValue');
+	deepEqual(iCat.util.storage('testKey'), 'testValue', 'testKey存入了localStorage');
+	iCat.util.clearStorage('testKey');
+	deepEqual(iCat.util.storage('testKey'), null, 'testKey已被删除');
+
+	iCat.util.storage('testKeyx', 'testValuex', true);
+});
+
+test('html engine', function(){
+	deepEqual(true, true);
+
+	console.log(iCat.util.zenCoding('div#page.a.b.c'));
+	console.log(iCat.util.zenCoding('header.hd+(div.main>span)+footer.ft'));
+	console.log(iCat.util.zenCoding('div#page.a.b.c>header.hd+(div.main>span)+footer.ft'));
+
+	//iCat.util.makeHtml({'#test_makeHtml': 'header#iHeader.hd + div#iScroll'});
+	iCat.util.unwrap(iCat.util.queryOne('#test_unwrap'));
+});
+
+test('template engine', function(){
+	deepEqual(true, true);
+
+	/*iCat.util.render({
+		tempId: 'test_temp',
+		wrap: '#test_makeHtml ul',
+		hooks: {
+			'&': ['.aaa.bbb.ccc#ddd#eee', 'data-abc~123456'],
+			'&>0': '.xxx.yyy.zzz.xxx',
+			'&>0:1': '.a#b'
+		},
+		//overwrite: true,
+		//onlyChild: true,
+		callback: function(){}
+	}, {a:1, b:2, c:3, d:4});//, undefined, true |, true
+
+	iCat.util.save('key_xxx', {a:1, b:2, c:3, d:4});
+	iCat.util.save('key_xxx', {a:1, b:2, c:3, d:4}, false);
+	iCat.util.remove('key_xxx');*/
+	var cfg = {
+		tempId: 'test_temp',
+		wrap: '#test_makeHtml ul',
+		hooks: {
+			'&': ['.aaa.bbb.ccc#ddd#eee', 'data-abc~123456'],
+			'&>0': '.xxx.yyy.zzz.xxx',
+			'&>0:1': '.a#b'
+		},
+		ajaxUrl: 'src/abc.php',
+		dataSave: true,
+		//overwrite: true,
+		//onlyChild: true,
+		callback: function(){}
+	};
+
+	iCat.util.fetch(cfg, function(data){
+		//iCat.log(data);
+		iCat.util.render(cfg, data);
 	});
 });
