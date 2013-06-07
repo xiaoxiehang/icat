@@ -74,6 +74,26 @@
 		for(var k in keyRegs){ iCat[k] = keyRegs[k].test(href); }
 	})();
 
+	// Get icat-js and set pageRef & weinreRef
+	(function(){
+		var scripts = doc.getElementsByTagName('script'),
+			curJs = scripts[scripts.length-1],
+			pc = iCat.PathConfig = {};
+
+		var baseURI = curJs.baseURI || doc.baseURI || doc.URL,
+			refSlipt = curJs.getAttribute('refSlipt') || '';
+		//fixed bug:分隔符在字符串里不存在时
+		if(refSlipt && baseURI.indexOf(refSlipt)==-1) refSlipt = false;
+
+		var strExp = iCat.DemoMode?
+					(refSlipt? '('+refSlipt+'/).*' : '(/)([\\w\\.]+)?\\?.*') : '(//[\\w\\.]+/).*',
+			regExp = new RegExp(strExp, 'g');
+
+		baseURI = (iCat.DemoMode && !refSlipt)? baseURI+'?' : baseURI;//fixed bug:加?为了匹配类似/index.php的情况
+		pc.pageRef = baseURI.replace(regExp, '$1');
+		pc.weinreRef = iCat.IPMode? baseURI.replace(/(\d+(\.\d+){3}).*/g, '$1:8080/') : '';
+	})();
+
 	// Copies all the properties of s to r.
 	// l(ist):黑/白名单, ov(erwrite):覆盖
 	iCat.mix = function(r, s, l, ov){
@@ -382,7 +402,7 @@
 			};
 		},
 
-		bubble: function(node, callback){//冒泡
+		bubble: function(node, callback){//冒泡 *待定
 			if(!node || node.nodeType!==1) return;
 			while(node!==doc.body){
 				if(callback && callback(node)==false) break;
@@ -404,7 +424,27 @@
 				fn(arr.concat()/*保护原数组*/, callback) : callback(arr);
 		},
 
-		jsonCompare: function(json1, json2){
+		fullUrl: function(url, argu){//isAjax|bi
+			var url = url || '',
+				bi = iCat.isString(argu)? argu : '',
+				isAjax = iCat.isBoolean(argu)? argu : false,
+				isUrl = /^\w+:\/\//.test(url);
+
+			url = url.replace(/^\//g, '');
+
+			if(iCat.DemoMode && url!=='' && !isUrl){
+				url = /[\?#]/.test(url)?
+					url.replace(/(\/\w+)([\?#])/g, '$1.php$2') :
+						/(\.\w+)$/.test(url)? url : url.replace(/([^\.]\w+)$/g, '$1.php');
+			}
+			if(!isAjax && bi){
+				url = url + (url.indexOf('?')<0? '?':'&') + bi.replace(/[\?&]+/g, '');
+			}
+
+			return (isUrl? '' : iCat.PathConfig.pageRef) + url;
+		},
+
+		jsonCompare: function(json1, json2){// *待定
 			if(!json1 || !json2) return false;
 			var _toString = function(json){
 				json = iCat.isString(json)? json : JSON.stringify(json);
@@ -447,7 +487,7 @@
 		 *
 		 * return [pid, argus]
 		*/
-		dealHash: function(s, objHash){
+		dealHash: function(s, objHash){// *待定
 			if(!s) return [''];
 
 			s = s.replace(/\s+/g, '').match(/[^\#]+/g)[0];
@@ -487,7 +527,7 @@
 
 	iCat.util(
 	{
-		matches: Sutil.matches || function(el, selector){
+		matches: Sutil.matches || function(el, selector){// *待定
 			if(!el || !selector) return false;
 			if(el.nodeType!==1 || el==doc.body) return false;//fixed bug:冒泡不能到body以上，会报错(Illegal invocation)
 
@@ -817,6 +857,10 @@
 								pWrap = iCat.util.queryOne(w);
 							iCat.isjQueryObject(pWrap) && (pWrap = pWrap[0]);
 
+							//兼容old-api
+							cfg.overwrite = cfg.repeatOverwrite!==undefined? cfg.repeatOverwrite : cfg.overwrite;
+							cfg.onlyChild = cfg.oneChild!==undefined? cfg.oneChild : cfg.onlyChild;
+
 							var	o = doc.createElement('wrap'),
 								uncla = (cfg.viewId || cfg.tempId) + '-loaded',
 								oldNodes = iCat.util.queryAll('*[data-unclass='+uncla+']', pWrap),
@@ -894,7 +938,7 @@
 						o = null;
 
 						// 回调函数
-						if(cfg.callback) cfg.callback(pWrap, cfg);
+						if(cfg.callback) cfg.callback(pWrap, cfg, data);
 
 						// 包含表单
 						var form = /form/i.test(pWrap.tagName) ?
@@ -934,6 +978,12 @@
 							IMData = cfg.viewId? iCat.Model.__pageData[cfg.viewId] : {},
 							ownData = IMData.ownData,
 							online = navigator.onLine==true;
+
+						//兼容old-api
+						cfg.dataSave = cfg.isSave!==undefined? cfg.isSave : cfg.dataSave;
+						cfg.dataKey = cfg.key!==undefined? cfg.key : cfg.dataKey;
+						cfg.overwrite = cfg.repeatOverwrite!==undefined? cfg.repeatOverwrite : cfg.overwrite;
+
 						if(cfg.dataSave){
 							cfg.dataKey = cfg.dataKey || '';
 							keyStorage = (cfg.viewId || cfg.tempId) + cfg.dataKey;
@@ -1127,8 +1177,7 @@
 				if(!iCat.util.ajax && iCat.$) iCat.rentAjax(iCat.$.ajax);
 				var oSelf = this;
 
-				cfg.ajaxUrl = iCat.util.fullUrl?
-					iCat.util.fullUrl(cfg.ajaxUrl, true) : cfg.ajaxUrl;
+				cfg.ajaxUrl = iCat.util.fullUrl(cfg.ajaxUrl, true);
 				iCat.util.ajax({
 					type: 'POST', timeout:10000,
 					url: cfg.ajaxUrl,

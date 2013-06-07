@@ -229,8 +229,8 @@ test('template engine', function(){
 		callback: function(){}
 	};
 
-	iCat.util.fetch(cfg, function(data){
+	/*iCat.util.fetch(cfg, function(data){
 		//iCat.log(data);
 		iCat.util.render(cfg, data);
-	});
+	});*/
 });
