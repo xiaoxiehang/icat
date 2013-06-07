@@ -1,5 +1,10 @@
 var iCat = ICAT;
+
 iCat.PathConfig();
+/*iCat.ModsConfig({
+	modName: 'aaa',
+	paths: ['./src/aaa.js', './src/bbb.js']
+});*/
 
 module('ICAT-loader');
 
@@ -9,19 +14,14 @@ test('', function(){
 
 iCat.inc('./src/aaa.js');
 
-/*iCat.require('testMod', ['aaa.js', 'bbb.js'], function(){
-	alert(AAAname+'load complated...');
-});
-iCat.log(iCat);*/
-
-iCat.ModsConfig({
-	modName: 'aaa',
-	paths: ['./src/aaa.js', './src/bbb.js']
-});
-iCat.use('aaa', function(){
-	alert(AAAname+'load complated...');
+iCat.include(['./src/aaa.js', './src/bbb.js'], function(){
+	alert(AAAname+'load complated 1...');
 });
 
-/*iCat.incfile(['aaa.js', 'bbb.js'], function(){
-	alert(AAAname+'load complated...');
-});*/
+iCat.require('testMod', ['./src/aaa.js', './src/bbb.js'], function(){
+	alert(AAAname+'load complated 2...');
+});
+
+iCat.use('testMod', function(){
+	alert(AAAname+'load complated 3...');
+});

@@ -6,7 +6,7 @@
  * Licensed under the MIT license.
  *
  * @Author valleykiddy@gmail.com
- * @Time 2013-05-22 16:00:00
+ * @Time 2013-06-02 09:00:00
  */
 
 /* core.js # */
@@ -290,21 +290,8 @@
 	/*-------------------------------------------*
 	 * The common tools of ICAT
 	 *-------------------------------------------*/
-	var ClaGroup = {}, Sutil = iCat.Shim.util || {};
-
-		_str2idclass = function(str){
-			if(!str) return [];
-
-			var s, sid, arrCla = [];
-			s = str.match(/(\#[\w\-\d]+)|(\.[\w\-\d]+)/g);
-			if(s!=null){
-				s.forEach(function(me){
-					/^\./.test(me)?
-						arrCla.push(me.substring(1)) : (sid = sid || me.substring(1));
-				});
-			}
-			return [sid, arrCla.unique()];
-		};
+	iCat.namespace('Once');
+	var Sutil = iCat.Shim.util || {};
 
 	//base
 	iCat.util(
@@ -366,52 +353,6 @@
 			})();
 		},
 
-		/*
-		 * opt = {
-		 *     callback: 执行函数
-		 *     context: 上下文
-		 *     delay: 懒执行延迟时间
-		 *     mustRunDelay: 到达一定时间必须执行
-		 * }
-		 */
-		throttle: function(opt){
-			var timer = null, t_start;
-
-			var fn = opt.callback,
-				context = opt.context,
-				delay = opt.delay || 100,
-				mustRunDelay = opt.mustRunDelay;
-			
-			return function(){
-				var args = arguments, t_curr = +new Date();
-				context = context || this;
-				
-				clearTimeout(timer);
-				if(!t_start){
-					t_start = t_curr;
-				}
-				if(mustRunDelay && t_curr - t_start >= mustRunDelay){
-					fn.apply(context, args);
-					t_start = t_curr;
-				}
-				else {
-					timer = setTimeout(function(){
-						fn.apply(context, args);
-					}, delay);
-				}
-			};
-		},
-
-		bubble: function(node, callback){//冒泡 *待定
-			if(!node || node.nodeType!==1) return;
-			while(node!==doc.body){
-				if(callback && callback(node)==false) break;
-				if(node.parentNode)
-					node = node.parentNode;
-				else break;
-			}
-		},
-
 		recurse: function(arr, callback){//递归
 			var fn = function(a, cb){
 				while(a.length){
@@ -444,7 +385,7 @@
 			return (isUrl? '' : iCat.PathConfig.pageRef) + url;
 		},
 
-		jsonCompare: function(json1, json2){// *待定
+		_jsonCompare: function(json1, json2){
 			if(!json1 || !json2) return false;
 			var _toString = function(json){
 				json = iCat.isString(json)? json : JSON.stringify(json);
@@ -452,6 +393,20 @@
 				return json;
 			};
 			return _toString(json1) === _toString(json2);
+		},
+
+		_str2Hooks: function(str){
+			if(!str) return [];
+
+			var s, sid, arrCla = [];
+			s = str.match(/(\#[\w\-\d]+)|(\.[\w\-\d]+)/g);
+			if(s!=null){
+				s.forEach(function(me){
+					/^\./.test(me)?
+						arrCla.push(me.substring(1)) : (sid = sid || me.substring(1));
+				});
+			}
+			return [sid, arrCla.unique()];
 		},
 
 		scroll: Sutil.scroll || function(box, callback){
@@ -476,58 +431,12 @@
 					pannelHeight = iCat.util.outerHeight(o);
 				callback(boxHeight, boxScrollTop, pannelHeight);
 			}, false);
-		},
-
-		/*
-		 * objHash = {
-			'help'                 : 'help',
-			'search/:query'        : 'search\/(\w+)',
-			'search/:query/p:page' : 'search\/(\w+)\/p(\w+)''
-		   }
-		 *
-		 * return [pid, argus]
-		*/
-		dealHash: function(s, objHash){// *待定
-			if(!s) return [''];
-
-			s = s.replace(/\s+/g, '').match(/[^\#]+/g)[0];
-			if(s.indexOf('/')<0)
-				return [s];
-			else {
-				/*
-				 * Examples:
-				 * #help            = "help"
-				 * #search/kiwis    = "search/:query"
-				 * #search/kiwis/p7 = "search/:query/p:page"
-				 */
-				if(!objHash) return;
-				var _s;
-				iCat.foreach(objHash, function(k, fn){
-					var _exp = new RegExp('^'+k+'$', 'i'),
-						argus = k.match(/\([^\)]+\)/g),
-						querys = '', len;
-					if(argus && (len=argus.length)){
-						argus.forEach(function(v, i){
-							querys += '$' + (i+1) + (i==len-1? '':',');
-						});
-					}
-					if(_exp.test(s)){
-						s = s.replace(_exp, querys);
-						s = s.split(',');
-						s.unshift(k);
-						_s = s;
-						return false;
-					}
-				});
-
-				return _s || [''];
-			}
 		}
 	});
 
 	iCat.util(
 	{
-		matches: Sutil.matches || function(el, selector){// *待定
+		_matches: Sutil.matches || function(el, selector){
 			if(!el || !selector) return false;
 			if(el.nodeType!==1 || el==doc.body) return false;//fixed bug:冒泡不能到body以上，会报错(Illegal invocation)
 
@@ -651,6 +560,33 @@
 		}
 	});
 
+	// kinds of width & height
+	iCat.foreach({Height:'height', Width:'width'}, function(name, type){
+		iCat.foreach(
+			{padding:'inner'+name, content:type, '':'outer'+name},
+			function(defaultExtra, funName){
+				iCat.util[funName] = function(elem){
+					if(!elem) return 0;
+					return (function(el, type){
+						var doc;
+						if(el===root){
+							return el.document.documentElement['client'+name];
+						}
+						if(el.nodeType===9){
+							doc = el.documentElement;
+							return Math.max(
+								el.body['scroll'+name], doc['scroll'+name],
+								el.body['offset'+name], doc['offset'+name],
+								doc['client'+name]
+							)
+						}
+						return el['client'+name];
+					})(elem);
+				};
+			}
+		);
+	});
+
 	//html engine
 	iCat.util(function(tools){
 		iCat.Class('Tools',
@@ -704,7 +640,7 @@
 
 			_tag: function(t){
 				if(!t) return '';
-				var s = _str2idclass(t),
+				var s = iCat.util._str2Hooks(t),
 					sid, arrCla, rpStr;
 				
 				arrCla = s[1].length? (' class="'+s[1].join(' ')+'"') : '';
@@ -821,10 +757,10 @@
 					o = null;
 				}
 			}
-		}, ClaGroup);
+		}, iCat.Once);
 		
-		tools = new ClaGroup.Tools();
-		delete ClaGroup.Tools; 
+		tools = new iCat.Once.Tools();
+		delete iCat.Once.Tools; 
 		return tools.init();
 	});
 	
@@ -1088,7 +1024,7 @@
 						v = v.split('~');
 						el.setAttribute(v[0]/*.replace(/^(\s|data-)?/, 'data-')*/, v[1]);
 					} else {
-						v = _str2idclass(v);
+						v = iCat.util._str2Hooks(v);
 						var oldClass = el.className? el.className.trim().split(/\s+/) : [],
 							newClass = v[1].concat(oldClass).unique();
 						if(v[0]) el.id = v[0];
@@ -1128,7 +1064,7 @@
 						if(isSelector){
 							var arrNode = [];
 							iCat.foreach(ref.children, function(i, v){
-								if(iCat.util.matches(v, b)) arrNode.push(v);
+								if(iCat.util._matches(v, b)) arrNode.push(v);
 							});
 							return arrNode;
 						} else
@@ -1147,7 +1083,7 @@
 							cnodes = [];
 							while(cp){
 								iCat.foreach(cp.children, function(i, v){
-									if(iCat.util.matches(v, b)){
+									if(iCat.util._matches(v, b)){
 										cnodes.push(v);
 									}
 								});
@@ -1252,7 +1188,7 @@
 							d.forEach(function(v){ _repeatStore(v, arr); });
 						} else {
 							var prevData = arr[0]? iCat.util.storage(arr[0]) : '';
-							if(iCat.util.jsonCompare(prevData, d)) return;//拒绝重复
+							if(iCat.util._jsonCompare(prevData, d)) return;//拒绝重复
 							var k = key + 'Repeat_' + arr.length + '_' + Math.floor(Math.random()*1000+1);
 							arr.unshift(k);
 							iCat.util.storage(key+'Repeat', arr.join(','));
@@ -1271,7 +1207,7 @@
 					return _key;
 				}
 
-				if(iCat.util.jsonCompare(firstData, data)) return _key;//拒绝重复
+				if(iCat.util._jsonCompare(firstData, data)) return _key;//拒绝重复
 
 				data = firstData? [firstData, data] : data;
 				arrKeys = arrKeys? arrKeys.split(',') : [];
@@ -1288,40 +1224,13 @@
 				}
 				iCat.util.clearStorage(key);
 			}
-		}, ClaGroup);
+		}, iCat.Once);
 
-		tools = new ClaGroup.Tools();
-		delete ClaGroup.Tools; 
+		tools = new iCat.Once.Tools();
+		delete iCat.Once.Tools; 
 		return tools.init();
 	});
 	
-	// Game over to null
-	ClaGroup = null;
-
-	// kinds of width & height
-	iCat.foreach({Height:'height', Width:'width'}, function(name, type){
-		iCat.foreach(
-			{padding:'inner'+name, content:type, '':'outer'+name},
-			function(defaultExtra, funName){
-				iCat.util[funName] = function(elem){
-					if(!elem) return 0;
-					return (function(el, type){
-						var doc;
-						if(el===root){
-							return el.document.documentElement['client'+name];
-						}
-						if(el.nodeType===9){
-							doc = el.documentElement;
-							return Math.max(
-								el.body['scroll'+name], doc['scroll'+name],
-								el.body['offset'+name], doc['offset'+name],
-								doc['client'+name]
-							)
-						}
-						return el['client'+name];
-					})(elem);
-				};
-			}
-		);
-	});
+	// Game over
+	delete iCat.Once;
 }).call(this);

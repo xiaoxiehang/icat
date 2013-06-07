@@ -53,58 +53,11 @@
 				},
 
 				fnOption: function(option, isRequire){
-					var opt = option, fn;
-					if(isRequire){
-						if(iCat.isString(opt)) opt = {modName:opt};
-						if(!iCat.isObject(opt) || !(opt.files = opt.files || iCat.ModsConfig[opt.modName])) return;
-					} else {
-						if(iCat.isString(opt) || iCat.isArray(opt)) opt = {files:opt};
-						if(!iCat.isObject(opt) || !opt.files) return;
-					}
-
-					opt.files = iCat.isString(opt.files) ?
-							oSelf.getURL([opt.files]) : oSelf.getURL(opt.files, opt.isSingle);
-
-					if(isRequire && oSelf._modGroup[opt.modName] && opt.callback){
-						opt.callback();
-						return;
-					}
-
-					if(isRequire) opt.isDepend = true;
-
-					(fn = function(){
-						if(!opt.files.length) return;
-						var curJS = opt.files.shift();
-						if(opt.files.length){
-							if(opt.isDepend)//文件间有依赖 顺序加载
-								oSelf.unblockLoad({
-									file: curJS,
-									callback: function(){
-										fn(opt.files);//next
-									},
-									context: opt.context,
-									modName: opt.modName
-								});
-							else {
-								oSelf.unblockLoad({
-									file: curJS,
-									context: opt.context
-								});
-								fn(opt.files);//next
-							}
-						} else {
-							oSelf.unblockLoad({
-								file: curJS,
-								callback: opt.callback,
-								context: opt.context,
-								modName: opt.modName
-							});
-						}
-					})();
+					oSelf._fnOption.apply(oSelf, arguments);
 				},
 
 				fnInclude: function(files, callback, isDepend, isSingle, context){
-					oSelf.fnOption({
+					oSelf._fnOption({
 						files: files, callback: callback,
 						isDepend: isDepend, isSingle: isSingle,
 						context: context
@@ -112,7 +65,7 @@
 				},
 
 				fnRequire: function(modName, files, callback, isSingle, context){
-					oSelf.fnOption({
+					oSelf._fnOption({
 						modName: modName,
 						files: files, callback: callback,
 						isSingle: isSingle, context: context
@@ -293,6 +246,58 @@
 					pNode.appendChild(node);
 				}
 			});
+		},
+
+		_fnOption: function(option, isRequire){
+			var oSelf = this,
+				opt = option, fn;
+			if(isRequire){
+				if(iCat.isString(opt)) opt = {modName:opt};
+				if(!iCat.isObject(opt) || !(opt.files = opt.files || iCat.ModsConfig[opt.modName])) return;
+			} else {
+				if(iCat.isString(opt) || iCat.isArray(opt)) opt = {files:opt};
+				if(!iCat.isObject(opt) || !opt.files) return;
+			}
+
+			opt.files = iCat.isString(opt.files) ?
+					oSelf.getURL([opt.files]) : oSelf.getURL(opt.files, opt.isSingle);
+
+			if(isRequire && oSelf._modGroup[opt.modName] && opt.callback){
+				opt.callback();
+				return;
+			}
+
+			if(isRequire) opt.isDepend = true;
+
+			(fn = function(){
+				if(!opt.files.length) return;
+				var curJS = opt.files.shift();
+				if(opt.files.length){
+					if(opt.isDepend)//文件间有依赖 顺序加载
+						oSelf.unblockLoad({
+							file: curJS,
+							callback: function(){
+								fn(opt.files);//next
+							},
+							context: opt.context,
+							modName: opt.modName
+						});
+					else {
+						oSelf.unblockLoad({
+							file: curJS,
+							context: opt.context
+						});
+						fn(opt.files);//next
+					}
+				} else {
+					oSelf.unblockLoad({
+						file: curJS,
+						callback: opt.callback,
+						context: opt.context,
+						modName: opt.modName
+					});
+				}
+			})();
 		}
 	}, iCat.Loader);
 
