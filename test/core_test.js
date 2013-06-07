@@ -147,12 +147,12 @@ test('base-methods', function(){
 		iCat.log(me);
 	});
 
-	iCat.util.bubble(
+	/*iCat.util.bubble(
 		iCat.util.queryOne('input[name="noglobals"]'),
 		function(me){
 			iCat.log(me);
 		}
-	);
+	);*/
 
 	iCat.util.scroll(document, function(bh, bs, ph){
 		console.log(bh, bs, ph);
@@ -163,10 +163,10 @@ test('base-methods', function(){
 test('dom-methods', function(){
 	var elTest = iCat.util.queryOne('#test_makeHtml');
 
-	deepEqual(iCat.util.matches(document, 'html'), false);
-	deepEqual(iCat.util.matches(document.body, 'body'), false);
-	deepEqual(iCat.util.matches(document), false);
-	deepEqual(iCat.util.matches(elTest, '#test_makeHtml'), true);
+	deepEqual(iCat.util._matches(document, 'html'), false);
+	deepEqual(iCat.util._matches(document.body, 'body'), false);
+	deepEqual(iCat.util._matches(document), false);
+	deepEqual(iCat.util._matches(elTest, '#test_makeHtml'), true);
 
 	iCat.util.addClass(elTest, 'testClass aaa');
 	iCat.util.removeClass(elTest, 'aaa');

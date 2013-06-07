@@ -541,21 +541,21 @@
 		},
 
 		trigger: function(el, type, bubbles, cancelable){
-			if(iCat.isObject(el) && !iCat.isjQueryObject(el)){// 普通对象
+			if(ICAT.isObject(el) && !ICAT.isjQueryObject(el)){// 普通对象
 				el[type] && el[type].apply(el, bubbles);
 				return;
 			}
 
-			if(iCat.isjQueryObject(el)) {// jquery对象
+			if(ICAT.isjQueryObject(el)) {// jquery对象
 				if(el.trigger){
 					el.trigger(type);
 					return;
 				} else el = el.get(0);
 			}
 
-			if(/\:dg$/i.test(type)){// 事件代理
-				type = type.replace(/\:dg$/i, '');
-				el = iCat.util.queryOne(el);
+			if(/^@\w+/i.test(type)){// 事件代理
+				type = type.replace(/^@/i, '');
+				el = ICAT.util.queryOne(el);
 				Event._execute(type, el);
 			}  else {
 				if(doc.createEventObject){

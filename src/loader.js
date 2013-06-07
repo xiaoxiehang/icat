@@ -219,13 +219,15 @@
 			if(!node) return;
 			
 			iCat.util.wait(function(k){
-				var pNode = doc.body || doc.getElementsByTagName('body')[0];
-				if(!pNode){
+				var nodeReady = doc.body || doc.getElementsByTagName('body')[0],
+					pNode;
+				if(!nodeReady){
 					iCat.__cache_timers[k] = false;
 					return;
 				}
 
 				delete iCat.__cache_timers[k];
+				pNode = doc.head || doc.getElementsByTagName('head')[0];
 				
 				/* 监听加载完成 */
 				if(type==='js'){

@@ -3,7 +3,22 @@
 	// 创建Event命名空间
 	var Event = iCat.namespace('Event');
 
-	iCat.mix(Event, {
+	iCat.mix(Event,
+	{
+		_parentIfText: function(node){
+			return node.nodeType===1? node : node.parentNode;
+		},
+
+		_bubble: function(node, callback){//冒泡 *待定
+			if(!node || node.nodeType!==1) return;
+			while(node!==doc.body){
+				if(callback && callback(node)==false) break;
+				if(node.parentNode)
+					node = node.parentNode;
+				else break;
+			}
+		},
+
 		_bindEvent: function(el, type, handler){
 			el.events = el.events || {};
 			el.types = el.types || [];
@@ -32,8 +47,9 @@
 
 		_execute: function(eType, el, evt, argus){
 			eType = eType.toLocaleLowerCase();
-			iCat.util.bubble(el, function(node, index){
-				index = iCat.util.matches(node, Event.__event_selectors);
+			if(argus==='refuseSham') argus = true;
+			Event._bubble(el, function(node, index){
+				index = iCat.util._matches(node, Event.__event_selectors);
 				var _preventDef = false, _stopBubble = false;
 				if(iCat.isNumber(index)){
 					var el = Event.items[Event.__event_selectors[index]];
@@ -52,12 +68,18 @@
 							//return false; fixed bug:阻止了本元素其他事件的执行
 						});
 						if(_preventDef){//阻止默认事件
-							Event.on(node, 'click.prevent', function(evt){ evt.preventDefault(); });
+							if(argus===true){
+								evt.preventDefault();
+							} else {
+								Event.on(node, 'click.prevent', function(evt){ evt.preventDefault(); });
+							}
 						}
 					}
 				}
 
 				if(_stopBubble){//阻止冒泡
+					if(argus)
+						evt.stopPropagation();
 					return false;
 				}
 			});
@@ -147,19 +169,22 @@
 		__event_selectors: [],
 
 		/*
-		 * o可以是<b>单个对象</b>或<b>对象数组</b>
-		 * o = {selector:'.cla', type:'click', callback:function(){}, preventDefault:true, stopPropagation:false}
+		 * arrObj可以是<b>单个对象</b>或<b>对象数组</b>
+		 * arrObj = {selector:'.cla', type:'click', callback:function(){}, preventDefault:true, stopPropagation:false}
 		 * disabled是否不起作用
 		 */
-		delegate: function(o, disabled){
-			if(!o || iCat.isEmptyObject(o) || o==[]) return;
+		delegate: function(arrObj, disabled){
+			if(!arrObj) return;
 			var arrSele = Event.__event_selectors;
 			var objItem = Event.items = Event.items || {};
-			var _refuseSham = /!$/.test(o.type);
-			o.type = o.type.toLocaleLowerCase();
-			o.type = _refuseSham? o.type.replace(/!/g,'') : o.type.replace(/click/g,'tap').replace(/mov/g,'swip');
+			
+			iCat.util.recurse(arrObj, function(o){
+				if(iCat.isEmptyObject(o)) return;
 
-			if(iCat.isObject(o)){
+				var _refuseSham = /!$/.test(o.type);
+				o.type = o.type.toLocaleLowerCase();
+				o.type = _refuseSham? o.type.replace(/!/g,'') : o.type.replace(/click/g,'tap').replace(/mov/g,'swip');
+
 				if(/blur|focus|load|unload|change/i.test(o.type)){//不适合代理的事件
 					iCat.util.wait(function(k){
 						var node = iCat.util.queryAll(o.selector);
@@ -184,34 +209,41 @@
 					el.events[key] = o.callback;
 
 					if(!/tap|swip|hover/i.test(o.type) || _refuseSham){//非模拟事件
-						if(!iCat.el_bodyWrap.events[o.type]){
-							Event.on(iCat.el_bodyWrap, o.type, function(evt){
-								Event._execute(o.type, evt.target, evt);
-							});
-						}
+						iCat.util.wait(function(k){
+							if(!iCat.elBodyWrap){
+								iCat.__cache_timers[k] = false;
+								return;
+							}
+
+							delete iCat.__cache_timers[k];
+							if(!iCat.elBodyWrap.events[o.type]){
+								Event.on(iCat.elBodyWrap, o.type, function(evt){
+									Event._execute(o.type, evt.target, evt, 'refuseSham');
+								});
+							}
+						});
 					}
 				}
-			}
-			else if(iCat.isArray(o)){
-				o.forEach(function(item){
-					arguments.callee(item);
-					o.shift();
-				});
-			}
+			});
 		},
 
-		//o = {selector:'#page', type:'click'}
-		undelegate: function(o){
-			if(!o || iCat.isEmptyObject(o) || o==[]) return;
+		//arrObj = {selector:'#page', type:'click'}
+		undelegate: function(arrObj){
+			if(!arrObj) return;
 			var arrSele = Event.__event_selectors;
 			var objItem = Event.items = Event.items || {};
-			var _refuseSham = /!$/.test(o.type);
-			o.type = o.type.toLocaleLowerCase();
-			o.type = _refuseSham? o.type.replace(/!/g,'') : o.type.replace(/click/g,'tap').replace(/mov/g,'swip');
 
-			if(iCat.isObject(o)){
+			iCat.util.recurse(arrObj, function(o){
+				if(iCat.isEmptyObject(o)) return;
+
+				var _refuseSham = /!$/.test(o.type),
+					node = iCat.util.queryAll(o.selector);
+				o.type = o.type.toLocaleLowerCase();
+				o.type = _refuseSham? o.type.replace(/!/g,'') : o.type.replace(/click/g,'tap').replace(/mov/g,'swip');
+				Event.off(node, 'click.prevent');
+
 				if(/blur|focus|load|unload|change/i.test(o.type)){
-					Event.off(iCat.util.queryAll(o.selector), o.type);
+					Event.off(node, o.type);
 				} else {
 					o.selector = o.selector.trim().replace(/\s+/g, ' ');
 					if(!arrSele.contains(o.selector) || !objItem[o.selector]) return;
@@ -231,13 +263,7 @@
 						delete objItem[o.selector];
 					}
 				}
-			}
-			else if(iCat.isArray(o)){
-				o.forEach(function(item){
-					arguments.callee(item);
-					o.shift();
-				});
-			}
+			});
 		},
 
 		on: function(el, type, handler, pd, sp){
@@ -275,7 +301,7 @@
 			end_evt = supportTouch ? 'touchend' : 'mouseup',
 			cancel_evt = supportTouch ? 'touchcancel' : 'mouseout';
 
-		var bodyNode = iCat.el_bodyWrap = iCat.util.queryOne('*[data-pagerole=body]'),
+		var bodyNode = iCat.elBodyWrap = iCat.util.queryOne('*[data-pagerole=body]'),
 			Event = iCat.Event, now, delta,
 			longTapDelay = 750, longTapTimeout,
 
@@ -291,7 +317,7 @@
 			};
 
 		if(!bodyNode){
-			iCat.el_bodyWrap = doc.body;
+			iCat.elBodyWrap = doc.body;
 			return;
 		}
 
@@ -304,7 +330,7 @@
 			var page = supportTouch? evt.touches[0] : evt;
 			now = Date.now();
 			delta = now - (touch.last || now);
-			touch.el = iCat.util.parentIfText(evt.target);
+			touch.el = Event._parentIfText(evt.target);
 			touchTimeout && clearTimeout(touchTimeout);
 
 			touch.x1 = page.pageX;
@@ -331,22 +357,17 @@
 			if(evt.button && evt.button===2) return;
 
 			cancelLongTap();
-			iCat.util.throttle({
-				callback: function(){
-					var page = supportTouch? evt.touches[0] : evt;
-					touch.x2 = page.pageX;
-					touch.y2 = page.pageY;
-					var distanceX = touch.x2 - touch.x1,
-						distanceY = touch.y2 - touch.y1;
-					if(typeof touch.isScrolling=='undefined'){
-						touch.isScrolling = !!(touch.isScrolling || Math.abs(distanceX)<Math.abs(distanceY));
-					}
-					if(!touch.isScrolling){
-						Event._execute('swiping', touch.el, evt, [touch.x1, touch.x2, touch.y1, touch.y2]);
-					}
-				},
-				mustRunDelay: 200
-			})();
+			var page = supportTouch? evt.touches[0] : evt;
+			touch.x2 = page.pageX;
+			touch.y2 = page.pageY;
+			var distanceX = touch.x2 - touch.x1,
+				distanceY = touch.y2 - touch.y1;
+			if(typeof touch.isScrolling=='undefined'){
+				touch.isScrolling = !!(touch.isScrolling || Math.abs(distanceX)<Math.abs(distanceY));
+			}
+			if(!touch.isScrolling){
+				Event._execute('swiping', touch.el, evt, [touch.x1, touch.x2, touch.y1, touch.y2]);
+			}
 		});
 
 		// end

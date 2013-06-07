@@ -58,7 +58,7 @@
 		};
 	});
 	iCat.isNull = function(obj){ return obj===null; };
-	iCat.isNumber = function(obj){ return !isNaN(Number(obj)); };
+	iCat.isNumber = function(obj){ return !/\D/.test(obj); };
 	iCat.isUndefined = function(obj){ return obj===undefined; };
 	iCat.isjQueryObject = function(obj){ return !!iCat.$ && obj instanceof iCat.$; };
 	iCat.isEmptyObject = function(obj){ for(var name in obj){return false;} return true; };
