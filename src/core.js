@@ -338,15 +338,15 @@
 			delay = delay || 100;
 			step = step || 1;
 			var cacheTimer = iCat.__cache_timers = iCat.__cache_timers || {};
-			var steps = 0,
+			var steps = 0, fn,
 				key = 'icat_timer' + Math.floor(Math.random()*1000000+1);
 
-			(function(){
-				var fn = arguments.callee;
+			(fn = function(){
 				callback(key, steps);
 				if(steps<delay && cacheTimer[key]===false){
-					setTimeout(function(){
+					var timer = setTimeout(function(){
 						steps = steps + step;
+						clearTimeout(timer);
 						fn();
 					}, step);
 				}

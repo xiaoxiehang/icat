@@ -140,6 +140,7 @@
 				}
 			};
 			pNode.appendChild(node);
+			pNode.removeChild(node);
 		},
 
 		getURL: function(arr, isSingle){//isSingle表示强制单个加载
@@ -247,6 +248,7 @@
 					},5);
 					oSelf._loadedGroup[option.file] = true;
 					pNode.appendChild(node);
+					pNode.removeChild(node);
 				}
 			});
 		},
