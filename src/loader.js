@@ -2,6 +2,7 @@
 (function(iCat, root, doc){
 	// 创建Loader命名空间
 	iCat.namespace('Loader');
+	
 	var fnPathConfig,
 		Sloader = iCat.Shim.loader || {};//keep Compatible
 

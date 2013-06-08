@@ -1,5 +1,100 @@
 /* mvc.js # */
 (function(iCat, root, doc){
+	// 创建mvc命名空间
+	iCat.namespace('mvc');
+
+	iCat.Class('Tools',
+	{
+		init: function(){
+			var oSelf = this;
+			return {
+				toArray: oSelf.toArray,
+
+				/*
+				 * Class: 父类
+				 * option: 继承时被共用的配置
+				 */
+				inherit: function(Class, option){
+					var Cla = function(){
+						var argus = oSelf.toArray(arguments);
+						if(option){
+							argus[1] = argus[1] || {};// fixed bug:如果没有第二个参数时，会合并不了
+							argus[1].config = argus[1].config || {};
+							iCat.mix(argus[1].config, option['config'], undefined, false); //此处false防止公用的config覆盖实例化的config
+							iCat.foreach(option, function(k, v){
+								// fixed bug:取或(||)时，最后一个config覆盖了前面的config
+								if(k!='config' && !iCat.isFunction(v)) argus[1][k] = v;
+							});
+						}
+						var ret = Class.apply(this, argus);
+						if(ret) return ret;// fixed bug: 当已有某实例化对象时，应返回它
+					};
+					iCat.mix(Cla.prototype, Class.prototype);
+					if(Cla.prototype.constructor==Object.prototype.constructor){
+						Cla.prototype.constructor = Cla;
+					}
+					if(option){
+						iCat.foreach(option, function(k, v){
+							if(iCat.isFunction(v)) Cla.prototype[k] = v;
+						});
+					}
+					Cla.__super__ = Class;
+					return Cla;
+				},
+
+				/*
+				 * objHash = {
+					'help'                 : 'help',
+					'search/:query'        : 'search\/(\w+)',
+					'search/:query/p:page' : 'search\/(\w+)\/p(\w+)''
+				   }
+				 *
+				 * return [pid, argus]
+				*/
+				dealHash: function(s, objHash){
+					if(!s) return [''];
+
+					s = s.replace(/\s+/g, '').match(/[^\#]+/g)[0];
+					if(s.indexOf('/')<0)
+						return [s];
+					else {
+						if(!objHash) return;
+						var _s;
+						iCat.foreach(objHash, function(k, fn){
+							var _exp = new RegExp('^'+k+'$', 'i'),
+								argus = k.match(/\([^\)]+\)/g),
+								querys = '', len;
+							if(argus && (len=argus.length)){
+								argus.forEach(function(v, i){
+									querys += '$' + (i+1) + (i==len-1? '':',');
+								});
+							}
+							if(_exp.test(s)){
+								s = s.replace(_exp, querys);
+								s = s.split(',');
+								s.unshift(k);
+								_s = s;
+								return false;
+							}
+						});
+
+						return _s || [''];
+					}
+				}
+			};
+		},
+
+		toArray: function(oArr){
+			var arr = [];
+			iCat.foreach(oArr, function(i,v){ arr.push(v); });
+			return arr;
+		}
+	}, iCat.mvc);
+
+	var tools = new iCat.mvc.Tools().init();
+	delete iCat.mvc.Tools;
+	delete iCat.mvc;
+
 	/*
 	 * view-module职责：ui中心
 	 * - 设置与ui相关的参数
@@ -43,17 +138,18 @@
 				self._htmlRender();
 		},
 
-		_render: function(data, before, clear){
+		_render: function(data, before, clear, outData){
 			var self = this, vid = self.viewId,
 				IMData = iCat.Model.__pageData[vid],
 				curCfg = IMData.config,
-				curWrap = iCat.util.queryOne(curCfg.wrap || curCfg.scrollWrap, iCat.el_curWrap);
+				curWrap = iCat.util.queryOne(curCfg.wrap || curCfg.scrollWrap, iCat.elCurWrap);
 			
 			if(self.model._dataChange(vid, data) ||//数据发生变化
 				iCat.singleMode ||//单层切换
 					!iCat.util.queryAll('*[data-unclass='+self.viewId+'-loaded]', curWrap).length){//对应子元素为空(fixed bug: 同init函数不同hash无法渲染)
-				if(data.Drepeat){
-					data.Drepeat.forEach(function(d, i){
+				if(outData) self.model.save(curCfg, data);
+				if(data.repeatData){
+					data.repeatData.forEach(function(d, i){
 						iCat.util.render(curCfg, d, before, i==0);
 					});
 				} else {
@@ -80,7 +176,7 @@
 					self._render(servData, before, clear);
 				});
 			} else if(data) {
-				self._render(data, before, clear);
+				self._render(data, before, clear, true);
 			}
 		},
 
@@ -151,25 +247,25 @@
 	 * - 响应用户动作，调用对应的View处理函数
 	 * - 每次extend都会生成一个新的controller-Class
 	 */
-	var Event = iCat.Event,
-		Controller = function(ctrlId, option){
-			option = option || {};
+	var Event = iCat.Event;
+	var	Controller = function(ctrlId, option){
+		option = option || {};
 
-			var self = this;
-			self.ctrlId = ctrlId;//必须
-			self.config = option.config || {};
-			self.routes = option.routes || {};
+		var self = this;
+		self.ctrlId = ctrlId;//必须
+		self.config = option.config || {};
+		self.routes = option.routes || {};
 
-			self.vmGroups = {};// key=viewId, value=modelId
-			self.wraps = [];// value=modHash
-			self.selectors = [];
+		self.vmGroups = {};// key=viewId, value=modelId
+		self.wraps = [];// value=modHash
+		self.selectors = [];
 
-			self._init(ctrlId, option, self.config);
-		};
+		self._init(ctrlId, option, self.config);
+	};
 	Controller.prototype = {
 		_init: function(cId, opt, cfg){
 			var self = this,
-				bodyId = iCat.el_bodyWrap.getAttribute('id');
+				bodyId;
 
 			if(!iCat.Controller[cId])//copy
 				iCat.Controller[cId] = self;
@@ -189,10 +285,8 @@
 			//全局调整结构
 			if(cfg.adjustLayout){
 				if(iCat.isString(cfg.adjustLayout) && cfg.baseBed){
-					var wraps = iCat.toArray(
-						iCat.util.queryAll(cfg.baseBed)
-					);
-					wraps.forEach(function(w){
+					var wraps = iCat.util.queryAll(cfg.baseBed);
+					iCat.foreach(wraps, function(w){
 						iCat.util.makeHtml(cfg.adjustLayout, w);
 					});
 				}
@@ -200,22 +294,30 @@
 					iCat.util.makeHtml(cfg.adjustLayout);
 				}
 			}
+			
+			iCat.util.wait(function(k){// fixed bug:合并状态下，js加载过快，会导致无法得到bodyWrap
+				if(!iCat.elBodyWrap){
+					iCat.__cache_timers[k] = false;
+					return;
+				}
+				delete iCat.__cache_timers[k];
 
-			//页面里没有id属性，则为锚点hash
-			if(iCat.isNull(bodyId)){
-				root['onhashchange'] = function(){
-					var hash = iCat.util.dealHash(location.hash, self.routes);
-					self.hashArgus = hash;
-					self.pseudoInit = true;
-					try{ self.routes[hash[0]].call(self); } catch(e){}
-				};
-			}
+				bodyId = iCat.elBodyWrap.getAttribute('id');
 
-			var hash = iCat.util.dealHash(
-					iCat.el_bodyWrap.id || location.hash, self.routes
-				);
-			self.hashArgus = hash;
-			try{ self.routes[hash[0]].call(self); } catch(e){}
+				//页面里没有id属性，则为锚点hash
+				if(iCat.isNull(bodyId)){
+					root['onhashchange'] = function(){
+						var hash = tools.dealHash(location.hash, self.routes);
+						self.hashArgus = hash;
+						self.pseudoInit = true;
+						try{ self.routes[hash[0]].call(self); } catch(e){}
+					};
+				}
+
+				var hash = tools.dealHash(bodyId || location.hash, self.routes);
+				self.hashArgus = hash;
+				try{ self.routes[hash[0]].call(self); } catch(e){}
+			}, 500, 10);
 		},
 
 		init: function(o){
@@ -230,15 +332,15 @@
 			self.modsLoad_mode = false;
 			if(self.routes.scrollWrap)
 				delete self.routes.scrollWrap;
-			if(iCat.el_curWrap){
-				iCat.util.addClass(iCat.el_curWrap, '__prev_baseBed');
-				iCat.util.removeClass(iCat.el_curWrap, curCla);
-				iCat.el_curWrap = null;
+			if(iCat.elCurWrap){
+				iCat.util.addClass(iCat.elCurWrap, '__prev_baseBed');
+				iCat.util.removeClass(iCat.elCurWrap, curCla);
+				iCat.elCurWrap = null;
 			}
 
 			// 设置操作层
 			if(o.baseBed){
-				curWrap = iCat.el_curWrap = iCat.util.queryOne(o.baseBed);
+				curWrap = iCat.elCurWrap = iCat.util.queryOne(o.baseBed);
 				iCat.util.addClass(curWrap, curCla);
 				delete o.baseBed;
 			}
@@ -253,10 +355,10 @@
 						console.log('The beds are not enough.');
 						return;
 					}
-					curWrap = iCat.el_curWrap = wraps[self.wraps.length];
+					curWrap = iCat.elCurWrap = wraps[self.wraps.length];
 					self.wraps.push(curPid);
 				} else {
-					curWrap = iCat.el_curWrap = wraps[self.wraps.indexOf(curPid)];
+					curWrap = iCat.elCurWrap = wraps[self.wraps.indexOf(curPid)];
 				}
 				iCat.util.addClass(curWrap, curCla);
 			}
@@ -270,11 +372,11 @@
 					w.innerHTML = singleHtml;
 					nodes = w.childNodes;
 					while(nodes.length){
-						iCat.el_bodyWrap.insertBefore(nodes[0], iCat.el_bodyWrap.firstChild);
+						iCat.elBodyWrap.insertBefore(nodes[0], iCat.elBodyWrap.firstChild);
 					}
-					iCat.el_curWrap = curWrap = iCat.util.queryOne(singleSele);
+					iCat.elCurWrap = curWrap = iCat.util.queryOne(singleSele);
 				} else {
-					iCat.el_curWrap = curWrap;
+					iCat.elCurWrap = curWrap;
 				}
 			}
 			else return;
@@ -287,7 +389,7 @@
 
 			// 操作层切换动画接口
 			page1 = iCat.util.queryOne('.__prev_baseBed');
-			page2 = iCat.el_curWrap;
+			page2 = iCat.elCurWrap;
 			if(o.switchPage) o.switchPage(page1, page2);
 			if(page1) iCat.util.removeClass(page1, '__prev_baseBed');
 
@@ -299,7 +401,7 @@
 
 			// 模块化加载模式
 			if(o.modules){
-				self.pageMods = o.modules.split(/\s*,\s*/);
+				self.pageMods = o.modules.trim().split(/\s*,\s*/);// fixed bug:前后有空格，模块加载失败
 				self.modsLoad_mode = !!self.pageMods.length;
 				delete o.modules;
 			}
@@ -358,7 +460,7 @@
 								self.routes.scrollWrap,
 								function(slHeight, slTop, spHeight){
 									if(!self.pageMods.length) return;
-									if(slTop+spHeight+50>=slHeight){
+									if(slTop+slHeight+50>=spHeight){
 										fn.call(self, 2);
 									}
 								}
@@ -413,6 +515,7 @@
 				Event.delegate(o, disabled);
 				if(!self.selectors.contains(o.selector)){
 					self.selectors.push(o.selector);
+					Event.__event_selectors.push(o.selector);
 				}
 			});
 		},
@@ -427,7 +530,7 @@
 					var fn = e.callback;
 					if(iCat.isString(fn)) fn = view[e.callback];
 					e.callback = function(){
-						var argus = iCat.toArray(arguments); //step2
+						var argus = tools.toArray(arguments); //step2
 							argus.unshift(view, view.model, iCat.Model.__pageData[view.viewId].config);//普通方法追加view, model, config
 						fn.apply(this, argus);
 					};
@@ -541,9 +644,9 @@
 
 	// 对外接口
 	iCat.namespace('View', 'Model', 'Controller');
-	iCat.View.extend       = function(opt){ return iCat.util._inherit(View, opt); };
-	iCat.Model.extend      = function(opt){ return iCat.util._inherit(Model, opt); };
-	iCat.Controller.extend = function(opt){ return iCat.util._inherit(Controller, opt); };
+	iCat.View.extend       = function(opt){ return tools.inherit(View, opt); };
+	iCat.Model.extend      = function(opt){ return tools.inherit(Model, opt); };
+	iCat.Controller.extend = function(opt){ return tools.inherit(Controller, opt); };
 
 	iCat.Model['__pageData'] = iCat.Model['__pageData'] || {};
 	iCat.mix(iCat.Model, {
@@ -558,7 +661,7 @@
 
 		dataChange: function(vid, d){
 			var oldData = iCat.Model.__pageData[vid].prevData,
-				ret = !iCat.util.jsonCompare(d, oldData);
+				ret = !iCat.util._jsonCompare(d, oldData);
 			iCat.Model.__pageData[vid].prevData = JSON.stringify(d);
 			return ret;
 		},

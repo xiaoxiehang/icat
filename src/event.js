@@ -9,7 +9,7 @@
 			return node.nodeType===1? node : node.parentNode;
 		},
 
-		_bubble: function(node, callback){//冒泡 *待定
+		_bubble: function(node, callback){//冒泡
 			if(!node || node.nodeType!==1) return;
 			while(node!==doc.body){
 				if(callback && callback(node)==false) break;

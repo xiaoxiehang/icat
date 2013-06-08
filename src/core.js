@@ -935,8 +935,19 @@
 						}
 					},
 
-					save: function(key, data, overwrite){//overwrite是否覆盖
-						return oSelf._dataSave(key, data, overwrite);
+					save: function(cfg, data){//overwrite是否覆盖
+						var keyStorage;
+
+						//兼容old-api
+						cfg.dataSave = cfg.isSave!==undefined? cfg.isSave : cfg.dataSave;
+						cfg.dataKey = cfg.key!==undefined? cfg.key : cfg.dataKey;
+						cfg.overwrite = cfg.repeatOverwrite!==undefined? cfg.repeatOverwrite : cfg.overwrite;
+
+						if(cfg.dataSave){
+							cfg.dataKey = cfg.dataKey || '';
+							keyStorage = (cfg.viewId || cfg.tempId) + cfg.dataKey;
+							oSelf._dataSave(keyStorage, data, cfg.overwrite);
+						}
 					},
 
 					remove: function(key){
@@ -1160,7 +1171,6 @@
 						data = data.split(',');
 						data.forEach(function(k){
 							var item = JSON.parse(iCat.util.storage(k));
-								item['rkey'] = k;
 							arr.push(item);
 						});
 						data = { repeatData: arr };
@@ -1175,7 +1185,7 @@
 
 			_dataSave: function(key, data, overwrite){
 				if(!key || !data) return;
-				if(iCat.isUndefined(overwrite)) overwrite = true;
+				if(iCat.isUndefined(overwrite) || /(Repeat)_\d+/.test(key)) overwrite = true;
 
 				var firstData = iCat.util.storage(key),
 					arrKeys = iCat.util.storage(key+'Repeat'),//索引
@@ -1192,6 +1202,7 @@
 							var k = key + 'Repeat_' + arr.length + '_' + Math.floor(Math.random()*1000+1);
 							arr.unshift(k);
 							iCat.util.storage(key+'Repeat', arr.join(','));
+							d.rkey = k;
 							iCat.util.storage(k, d);
 						}
 					};
@@ -1204,15 +1215,14 @@
 						repeatKeys[_key] = false;
 						iCat.util.storage('repeatKeys', repeatKeys);
 					}
-					return _key;
+					return;
 				}
 
-				if(iCat.util._jsonCompare(firstData, data)) return _key;//拒绝重复
+				if(iCat.util._jsonCompare(firstData, data)) return;//拒绝重复
 
-				data = firstData? [firstData, data] : data;
+				data = firstData? [JSON.parse(firstData), data] : data;
 				arrKeys = arrKeys? arrKeys.split(',') : [];
 				_repeatStore(data, arrKeys);
-				return arrKeys;
 			},
 
 			_dataRemove: function(key){

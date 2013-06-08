@@ -5,6 +5,7 @@
 				tempId: 'item-template',
 				wrap: '#todo-list',
 				isSave: true,
+				overwrite: false,
 				events: [
 					{selector:'#new-todo', type:'keypress', callback:'createOnEnter'},
 					{selector:'.edit', type:'keypress', callback:'updateOnEnter'},
@@ -18,9 +19,9 @@
 
 			createOnEnter: function(v, m, cfg, evt){
 				if(evt.keyCode!=13) return;
-				if(!this.value) return;
+				if(!this.value) return;iCat.log(iCat.View['aView'])
 				v.setData(
-					m.addItem(this.value, v.viewId, cfg.isSave, aView = iCat.View['aView']), true
+					m.addItem(this.value, v.viewId, cfg.isSave, iCat.View['aView']), true
 				);
 				this.value = '';
 			},
@@ -74,8 +75,8 @@
 					elAll = iCat.util.queryOne('#toggle-all'),
 					maxlen = m.maxLength('mView'), len;
 				m.fetch({viewId:'mView', isSave:true}, function(data){
-					if(!data.Drepeat) return;
-					data.Drepeat.forEach(function(v){
+					if(!data.repeatData) return;
+					data.repeatData.forEach(function(v){
 						if(v.done){
 							$('li[data-repeatid='+v.rkey+']').addClass('done');
 							arr.push(v.rkey);
@@ -143,12 +144,7 @@
 		addItem: function(val, key, isSave, v){
 			var data = {title:val, done:false},
 				keys = iCat.util.storage(key+'Repeat');
-			if(isSave){
-				/(Repeat)_\d+/.test(key)?
-					this.save(key, data, true) : this.save(key, data);
-			}
 			v.init(v, v.model);
-			if(keys) data.rkey = keys.split(',')[0];
 			return data;
 		},
 
@@ -158,8 +154,6 @@
 			val = val===undefined? oldData.title : val;
 			done = done===undefined? oldData.done : done;
 			data = {title:val, done:done};
-			/(Repeat)_\d+/.test(key)?
-				this.save(key, data, true) : this.save(key, data);
 			return data;
 		},
 
