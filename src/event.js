@@ -90,7 +90,9 @@
 			el = iCat.util.queryAll(el);
 			if(iCat.isjQueryObject(el)){//兼容jquery
 				el.bind? el.bind(type, handler) :
-					arguments.callee(iCat.util.queryAll(el.selector), type, handler);
+					iCat.foreach(el, function(i,v){
+						Event._bindEvent(v.get(0), type, handler);
+					});
 			} else {
 				el.length===undefined ?
 					Event._bindEvent(el, type, handler) :
@@ -105,7 +107,9 @@
 			el = iCat.util.queryAll(el);
 			if(iCat.isjQueryObject(el)){//兼容jquery
 				el.unbind? el.unbind(type) :
-					arguments.callee(iCat.util.queryAll(el.selector), type);
+					iCat.foreach(el, function(i,v){
+						Event._unbindEvent(v.get(0), type);
+					});
 			} else {
 				el.length===undefined ?
 					Event._unbindEvent(el, type) :
@@ -123,16 +127,17 @@
 
 			if(iCat.isjQueryObject(el)) {// jquery对象
 				if(el.trigger){
-					el.trigger(type);
-					return;
-				} else el = el.get(0);
+					el.trigger(type); return;
+				} else
+					el = el.get(0);
 			}
 
 			if(/^@\w+/i.test(type)){// 事件代理
 				type = type.replace(/^@/i, '');
 				el = iCat.util.queryOne(el);
 				Event._execute(type, el);
-			}  else { // 普通元素
+			}
+			else { // 普通元素
 				var ev = doc.createEvent('Event');
 				ev.initEvent(type, bubbles, cancelable);
 				el.dispatchEvent(ev);
@@ -171,9 +176,8 @@
 		/*
 		 * arrObj可以是<b>单个对象</b>或<b>对象数组</b>
 		 * arrObj = {selector:'.cla', type:'click', callback:function(){}, preventDefault:true, stopPropagation:false}
-		 * disabled是否不起作用
 		 */
-		delegate: function(arrObj, disabled){
+		delegate: function(arrObj){
 			if(!arrObj) return;
 			var arrSele = Event.__event_selectors;
 			var objItem = Event.items = Event.items || {};
@@ -198,7 +202,7 @@
 				}
 				else {
 					o.selector = o.selector.trim().replace(/\s+/g, ' ');
-					if(!arrSele.contains(o.selector) && !disabled) arrSele.push(o.selector);
+					if(!arrSele.contains(o.selector)) arrSele.push(o.selector);
 					var el = objItem[o.selector] = objItem[o.selector] || {},
 						key = o.type + '|' + (o.preventDefault? 1:0) + '|' + (o.stopPropagation? 1:0);
 					el.events = el.events || {};
@@ -216,6 +220,7 @@
 							}
 
 							delete iCat.__cache_timers[k];
+							
 							if(!iCat.elBodyWrap.events[o.type]){
 								Event.on(iCat.elBodyWrap, o.type, function(evt){
 									Event._execute(o.type, evt.target, evt, 'refuseSham');

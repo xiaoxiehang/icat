@@ -719,26 +719,29 @@
 			_bracket: function(s){
 				if(!s) return '';
 
-				var oSelf = this;
-				if(!/\(|\)/.test(s))
-					return s.indexOf('+')? oSelf._sibling(s) : oSelf._stack(s);
+				var oSelf = this,
+					singlefn = function(sExp){
+						if(!/\(|\)/.test(sExp))
+							return sExp.indexOf('+')? oSelf._sibling(sExp) : oSelf._stack(sExp);
+						
+						if(/\+\([^\)]+/.test(sExp)){
+							var str = '';
+							sExp = sExp.replace(/\+\(([^\)]+)/g, ',$1,');
+							sExp = sExp.split(',');
+							sExp.forEach(function(v){
+								v = v.replace(/\(|\)\+?/g, '');
+								str += oSelf._stack(v);
+							});
+							return str;
+						}
+					};
 
-				var str;
-				if(/\+\s*\([^\)]+/.test(s)){
-					str = '';
-					s = s.replace(/\+\s*\(([^\)]+)/g, ',$1,');
-					s = s.split(',');
-					s.forEach(function(v){
-						v = v.replace(/\(|\)/g, '');
-						str += oSelf._stack(v);
-					});
+				if(/\>\(/.test(s)){
+					s = s.replace(/(\>)(\()/g, '$1,$2').split('>,');
+					return oSelf._stack(s[0]).replace(/\&nbsp;/g, singlefn(s[1]));
+				} else {
+					return singlefn(s);
 				}
-				else if(/\>\s*\(/.test(s)){
-					s = s.split('>');
-					str = oSelf._stack[s[0]].replace(/\&nbsp;/g, arguments.callee(s[1]));
-				}
-
-				return str;
 			},
 
 			_makeHtml: function(items, pNode, clear){
@@ -936,7 +939,8 @@
 					},
 
 					save: function(cfg, data){//overwrite是否覆盖
-						var keyStorage;
+						if(iCat.isString(cfg))
+							return oSelf._dataSave(cfg, data);
 
 						//兼容old-api
 						cfg.dataSave = cfg.isSave!==undefined? cfg.isSave : cfg.dataSave;
@@ -945,8 +949,8 @@
 
 						if(cfg.dataSave){
 							cfg.dataKey = cfg.dataKey || '';
-							keyStorage = (cfg.viewId || cfg.tempId) + cfg.dataKey;
-							oSelf._dataSave(keyStorage, data, cfg.overwrite);
+							var keyStorage = (cfg.viewId || cfg.tempId) + cfg.dataKey;
+							return oSelf._dataSave(keyStorage, data, cfg.overwrite);
 						}
 					},
 
@@ -1130,13 +1134,14 @@
 					url: cfg.ajaxUrl,
 					cache: false,
 					success: function(data){
-						var _data = JSON.stringify(data);
+						var _data = JSON.stringify(data), ret;
 
 						if(cfg.globalKey)
 							iCat.Model.GlobalData(cfg.globalKey, data);
 						if(keyStorage)
-							oSelf._dataSave(keyStorage, _data, cfg.overwrite);
-
+							ret = oSelf._dataSave(keyStorage, _data, cfg.overwrite);
+						if(!!ret && iCat.isArray(ret))
+							data = { repeatData: ret };
 						iCat.mix(data, ownData);
 						if(callback) callback(data);
 					},
@@ -1223,6 +1228,7 @@
 				data = firstData? [JSON.parse(firstData), data] : data;
 				arrKeys = arrKeys? arrKeys.split(',') : [];
 				_repeatStore(data, arrKeys);
+				return data;
 			},
 
 			_dataRemove: function(key){

@@ -189,7 +189,7 @@ test('html engine', function(){
 
 	console.log(iCat.util.zenCoding('div#page.a.b.c'));
 	console.log(iCat.util.zenCoding('header.hd+(div.main>span)+footer.ft'));
-	console.log(iCat.util.zenCoding('div#page.a.b.c>header.hd+(div.main>span)+footer.ft'));
+	console.log(iCat.util.zenCoding('div#page.a.b.c>(header.hd+(div.main>span)+footer.ft)'));
 
 	//iCat.util.makeHtml({'#test_makeHtml': 'header#iHeader.hd + div#iScroll'});
 	iCat.util.unwrap(iCat.util.queryOne('#test_unwrap'));

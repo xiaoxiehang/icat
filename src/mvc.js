@@ -139,23 +139,29 @@
 		},
 
 		_render: function(data, before, clear, outData){
-			var self = this, vid = self.viewId,
+			var self = this, vid = self.viewId, ret1, ret2,
 				IMData = iCat.Model.__pageData[vid],
+				ownData = IMData.ownData,
 				curCfg = IMData.config,
 				curWrap = iCat.util.queryOne(curCfg.wrap || curCfg.scrollWrap, iCat.elCurWrap);
 			
 			if(self.model._dataChange(vid, data) ||//数据发生变化
 				iCat.singleMode ||//单层切换
 					!iCat.util.queryAll('*[data-unclass='+self.viewId+'-loaded]', curWrap).length){//对应子元素为空(fixed bug: 同init函数不同hash无法渲染)
-				if(outData) self.model.save(curCfg, data);
+				if(outData){//设置setData得到的数据
+					ret1 = self.model.save(curCfg, data);
+					if(!!ret1 && iCat.isArray(ret1))
+						data = { repeatData: ret1 };
+					iCat.mix(data, ownData);
+				}
 				if(data.repeatData){
 					data.repeatData.forEach(function(d, i){
 						iCat.util.render(curCfg, d, before, i==0);
 					});
 				} else {
-					var ret = iCat.util.render(curCfg, data, before, clear);
-					if(ret && iCat.isFunction(ret)){
-						self.getFormData = ret;
+					ret2 = iCat.util.render(curCfg, data, before, clear);
+					if(ret2 && iCat.isFunction(ret2)){
+						self.getFormData = ret2;
 					}
 				}
 			}
@@ -235,7 +241,7 @@
 			iCat.util.fetch.apply(this, arguments);
 		},
 		save: function(){
-			iCat.util.save.apply(this, arguments);
+			return iCat.util.save.apply(this, arguments);
 		},
 		remove: function(){
 			iCat.util.remove.apply(this, arguments);

@@ -15,15 +15,15 @@
 				]
 			},
 
-			init: function(v, m, cfg){ $('#main').show(); },
-
 			createOnEnter: function(v, m, cfg, evt){
 				if(evt.keyCode!=13) return;
-				if(!this.value) return;iCat.log(iCat.View['aView'])
-				v.setData(
-					m.addItem(this.value, v.viewId, cfg.isSave, iCat.View['aView']), true
-				);
+				if(!this.value) return;
+				
+				v.setData(m.addItem(this.value), true);
 				this.value = '';
+
+				var aView = iCat.View['aView'];
+				aView.init(aView, aView.model);
 			},
 
 			updateOnEnter: function(v, m, cfg, evt){
@@ -32,8 +32,9 @@
 			},
 
 			clear: function(v, m, cfg, evt){
-				$(this).parents('li').remove();
-				m.remove(this.getAttribute('data-repeatid'));
+				var li = $(this).parents('li');
+				m.remove(li.attr('data-repeatid'));
+				li.remove();
 
 				var aView = iCat.View['aView'];
 				aView.init(aView, aView.model);
@@ -71,12 +72,24 @@
 			init: function(v, m, init){
 				var arr = this.arrChecked = [],
 					ft = $('#todoapp footer'),
+					main = $('#main'),
 					countBar = ft.find('#todo-count'), allDel = countBar.siblings('.clear-completed'),
 					elAll = iCat.util.queryOne('#toggle-all'),
 					maxlen = m.maxLength('mView'), len;
 				m.fetch({viewId:'mView', isSave:true}, function(data){
-					if(!data.repeatData) return;
-					data.repeatData.forEach(function(v){
+					if(!data || iCat.isEmptyObject(data)){
+						main.hide(); return;
+					}
+
+					if(data.repeatData){
+						data = data.repeatData;
+					} else {
+						main.find('li').attr('data-repeatid', data.rkey = 'mView');
+						data = [data];
+					}
+					
+					main[data.length? 'show':'hide']();
+					data.forEach(function(v){
 						if(v.done){
 							$('li[data-repeatid='+v.rkey+']').addClass('done');
 							arr.push(v.rkey);
@@ -117,14 +130,14 @@
 			toggleAllComplete: function(v, m){
 				var lis = this.checked?
 						$('#todo-list li:not(.done)') : $('#todo-list .done'),
-					arr = v.arrChecked, isChecked = this.checked;
+					isChecked = this.checked;
 
 				iCat.foreach(lis, function(i, el){
 					var me = $(el);
 					isChecked?
 						me.find('.toggle').attr('checked', true) : me.find('.toggle').removeAttr('checked');
 					me[isChecked? 'addClass' : 'removeClass']('done');
-					m.updateItem(undefined, isChecked, me.attr('data-repeatid'), arr);
+					m.updateItem(undefined, isChecked, me.attr('data-repeatid'));
 				});
 				v.init(v, m);
 			},
@@ -134,27 +147,23 @@
 					pLi = me.parents('li');
 
 				pLi.toggleClass('done');
-				m.updateItem(undefined, this.checked, pLi.attr('data-repeatid'), this.arrChecked);
+				m.updateItem(undefined, this.checked, pLi.attr('data-repeatid'));
 				v.init(v, m);
 			}
 		}
 	);
 
 	var mainModel = iCat.Model.extend({
-		addItem: function(val, key, isSave, v){
-			var data = {title:val, done:false},
-				keys = iCat.util.storage(key+'Repeat');
-			v.init(v, v.model);
-			return data;
+		addItem: function(val){
+			return {title:val, done:false};
 		},
 
 		updateItem: function(val, done, key){
 			var oldData = JSON.parse( iCat.util.storage(key) || '{}' ),
-				data;
-			val = val===undefined? oldData.title : val;
-			done = done===undefined? oldData.done : done;
-			data = {title:val, done:done};
-			return data;
+				data = {};
+			if(!iCat.isUndefined(val)) data.title = val;
+			if(!iCat.isUndefined(done)) data.done = done;
+			this.save(key, iCat.mix(oldData, data));
 		},
 
 		removeItem: function(key){
@@ -162,8 +171,9 @@
 		},
 
 		maxLength: function(vid){
-			var keys = iCat.util.storage(vid+'Repeat') || '';
-			return keys===''? 0 : keys.split(',').length;
+			var keys = iCat.util.storage(vid+'Repeat') || iCat.util.storage(vid) || '';
+			return keys===''? 0 :
+				/\{.*\}/.test(keys)? 1 : keys.split(',').length;
 		}
 	});
 
