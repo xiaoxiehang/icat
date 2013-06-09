@@ -6,7 +6,7 @@
 		}
 	});
 
-	iCat.include('lib/jquery/jquery.js', function(){
+	iCat.include('lib/jquery.js', function(){
 		iCat.include('./mvc.source.js');
 	});
 })(ICAT);

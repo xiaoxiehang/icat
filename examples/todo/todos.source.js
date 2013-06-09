@@ -191,5 +191,5 @@
 		}
 	});
 
-	iCat.ctrlAble(new appCtrl('mCtrl'));
+	new appCtrl('mCtrl');
 })(ICAT);

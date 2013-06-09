@@ -139,8 +139,6 @@
 					iCat.$ = root['jQuery'] || root['Zepto'];
 				}
 			};
-			pNode.appendChild(node);
-			pNode.removeChild(node);
 		},
 
 		getURL: function(arr, isSingle){//isSingle表示强制单个加载
@@ -247,9 +245,10 @@
 						}
 					},5);
 					oSelf._loadedGroup[option.file] = true;
-					pNode.appendChild(node);
-					pNode.removeChild(node);
 				}
+
+				pNode.appendChild(node);
+				setTimeout(function(){pNode.removeChild(node);},10);
 			});
 		},
 
@@ -280,26 +279,17 @@
 				if(opt.files.length){
 					if(opt.isDepend)//文件间有依赖 顺序加载
 						oSelf.unblockLoad({
-							file: curJS,
-							callback: function(){
-								fn(opt.files);//next
-							},
-							context: opt.context,
-							modName: opt.modName
+							file:curJS, modName:opt.modName,
+							callback:function(){fn(opt.files);/*next*/}, context:opt.context
 						});
 					else {
-						oSelf.unblockLoad({
-							file: curJS,
-							context: opt.context
-						});
-						fn(opt.files);//next
+						oSelf.unblockLoad({file:curJS, context:opt.context});
+						fn(opt.files);/*next*/
 					}
 				} else {
 					oSelf.unblockLoad({
-						file: curJS,
-						callback: opt.callback,
-						context: opt.context,
-						modName: opt.modName
+						file:curJS, modName:opt.modName,
+						callback:opt.callback, context:opt.context
 					});
 				}
 			})();

@@ -8,15 +8,13 @@
 		init: function(){
 			var oSelf = this;
 			return {
-				toArray: oSelf.toArray,
-
 				/*
 				 * Class: 父类
 				 * option: 继承时被共用的配置
 				 */
 				inherit: function(Class, option){
 					var Cla = function(){
-						var argus = oSelf.toArray(arguments);
+						var argus = iCat.toArray(arguments);
 						if(option){
 							argus[1] = argus[1] || {};// fixed bug:如果没有第二个参数时，会合并不了
 							argus[1].config = argus[1].config || {};
@@ -80,14 +78,202 @@
 
 						return _s || [''];
 					}
+				},
+
+				regEvents: function(view, cfg){// bind-events
+					if(cfg.events){
+						iCat.util.recurse(cfg.events, function(e){
+							//此处如果直接e.callback=f，e.callback已被替换，无法找到函数
+							var fn = e.callback;
+							if(iCat.isString(fn)) fn = view[e.callback];
+							e.callback = function(){
+								var argus = iCat.toArray(arguments); //step2
+									argus.unshift(view, view.model, cfg);//普通方法追加view, model, config
+								fn.apply(this, argus);
+							};
+							if(iCat.Event)
+								iCat.Event.delegate(e);
+							else if(iCat.$ && iCat.$.event)
+								iCat.$(iCat.elCurWrap).delegate(e.selector, e.type.replace(/!/g, ''), e.callback);
+						});
+					}
+				},
+
+				/*
+				 * 页面初始化分三种情况：
+				 * - 多页面(multiPage)切换：此种情况下，每次都是“真实初始化”
+				 * - 单页面单层(singleLayer)：此种情况下，第一次是“真实初始化”，以后是“半伪初始化”
+				 * - 单页面多层(multiLayer)切换：此种情况下，第一次是“真实初始化”，以后是“伪初始化”
+				 * 
+				 * #真实初始化：直接实例化view和model，绑定events，进行页面渲染，不用进行数据比较
+				 * #半伪初始化：清空上次的dom和events，进行真实初始化
+				 * #伪初始化：清空上次的events，如果是空白层则进行真实初始化，如果非空则选择性渲染
+				 */
+				multiPage: function(){
+					oSelf._baseInit.apply(oSelf, arguments);
+				},
+
+				singleLayer: function(c, o){
+					// clear
+					if(c.modsLoad_mode) delete c.modsLoad_mode;
+					if(c.routes.scrollWrap) delete c.routes.scrollWrap;
+					c.vmClear();
+
+					oSelf._baseInit(c, o);
+				},
+
+				multiLayer: function(c, o){
+					var cfg = c.config,
+						wraps = c.pageWraps,
+						curGroup = c.wrapGroup, curPid = c.hashArgus[0],
+						curCla = cfg.currentCla || 'icat-current-wrap',
+						curWrap, page1, page2;
+					
+					// clear
+					if(c.modsLoad_mode) delete c.modsLoad_mode;
+					if(c.routes.scrollWrap) delete c.routes.scrollWrap;
+					c.vmClear();
+					if(iCat.elCurWrap){
+						iCat.util.addClass(iCat.elCurWrap, '__prev_baseBed');
+						iCat.util.removeClass(iCat.elCurWrap, curCla);
+						delete iCat.elCurWrap;
+					}
+
+					// 设置操作层
+					if(!curGroup.contains(curPid)){
+						if(wraps.length==curGroup.length){
+							page1 = iCat.util.queryOne('.__prev_baseBed');
+							iCat.util.removeClass(page1, '__prev_baseBed');
+							iCat.util.addClass(page1, curCla);
+							console.log('The beds are not enough.');
+							return;
+						}
+						curWrap = iCat.elCurWrap = wraps[curGroup.length];
+						curGroup.push(curPid);
+					} else {
+						curWrap = iCat.elCurWrap = wraps[curGroup.indexOf(curPid)];
+					}
+					iCat.util.addClass(curWrap, curCla);
+
+					// 操作层切换动画接口
+					page1 = iCat.util.queryOne('.__prev_baseBed');
+					page2 = iCat.elCurWrap;
+					if(o.switchPage) o.switchPage(page1, page2);
+					if(page1) iCat.util.removeClass(page1, '__prev_baseBed');
+
+					oSelf._baseInit(c, o);
 				}
 			};
 		},
 
-		toArray: function(oArr){
-			var arr = [];
-			iCat.foreach(oArr, function(i,v){ arr.push(v); });
-			return arr;
+		_baseInit: function(c, o){
+			var cfg = c.config,
+				curWrap = iCat.elCurWrap;
+			if(!curWrap) return;
+
+			// page set
+			if(o.baseBed) delete o.baseBed;
+
+			if(o.setAjax){
+				delete iCat.util.ajax;
+				iCat.rentAjax(o.setAjax[0], o.setAjax[1]);
+			}
+			if(o.modules){
+				c.pageMods = o.modules.replace(/\s+/, '').split(',');// fixed bug:前后有空格，模块加载失败
+				c.modsLoad_mode = !!c.pageMods.length;
+				delete o.modules;
+			}
+
+			if(o.vmGroups) o = o.vmGroups;
+
+			// page render
+			c.vmAdd(o, true);
+			c.modsLoad_mode? this._modsLoad(c) : this._commLoad(c);
+		},
+
+		// type: 0=common, 1=height-load, 2=scroll-load
+		__serialize: function(c, type, mh, wh){
+			if(!c.pageMods.length || !c.pageMods[0]) return;
+
+			var fn = this._serialize, vid = c.pageMods[0],
+				curView = iCat.View[vid], modelId = c.vmGroups[vid],
+				IMData = iCat.Model.ViewData(vid),
+				cfg;
+			if(!curView || !IMData){// fixed bug:某个模块请求失败，影响后续加载
+				c.pageMods.shift();
+				fn.apply(c, arguments);
+				return;
+			}
+
+			cfg = IMData.config;
+			switch(type){
+				case 0:
+					cfg.loadCallback = function(node){
+						c.pageMods.shift();
+						if(node) iCat.util.unwrap(node);
+						fn.call(c, 0);
+					};
+					curView.setModel(iCat.Model[modelId]);
+				break;
+
+				case 1:
+					cfg.loadCallback = function(node){
+						c.pageMods.shift();
+						if(node){
+							mh = mh + iCat.util.outerHeight(node);
+							iCat.util.unwrap(node);
+						}
+						if(mh<=wh+20 && c.pageMods.length){
+							fn.call(c, 1, mh, wh);
+						} else if(c.pageMods.length){
+							iCat.util.scroll(
+								c.routes.scrollWrap,
+								function(slHeight, slTop, spHeight){
+									if(!c.pageMods.length) return;
+									if(slTop+slHeight+50>=spHeight){
+										fn.call(c, 2);
+									}
+								}
+							);
+						}
+					};
+					curView.setModel(iCat.Model[modelId]);
+				break;
+
+				case 2:
+					if(curView.loaded==undefined){//拒绝重复
+						curView.loaded = false;
+						cfg.loadCallback = function(node, blankHtml){
+							c.pageMods.shift();
+							curView.loaded = true;
+							if(node) iCat.util.unwrap(node);
+							if(blankHtml) fn.call(c, 2);
+						};
+						curView.setModel(iCat.Model[modelId]);
+					}
+				break;
+			}
+		},
+
+		_modsLoad: function(c){// 模块化加载
+			var self = this;
+			if(c.routes.scrollWrap){// 滚动加载
+				var winHeight = iCat.util.outerHeight(root),
+					modsHeight = 0;
+				self.__serialize(c, 1, modsHeight, winHeight);
+			} else {
+				if(c.pageMods.length){
+					self.__serialize(c, 0);
+				}
+			}
+		},
+
+		_commLoad: function(c){// 普通加载
+			iCat.foreach(c.vmGroups, function(vid, mid){
+				var curView = iCat.View[vid],
+					curModel = iCat.Model[mid];
+				curView.setModel(curModel);
+			});
 		}
 	}, iCat.mvc);
 
@@ -115,10 +301,8 @@
 		_init: function(opt, vid){
 			var self = this, IMData;
 
-			if(!iCat.Model[vid]){//data
-				IMData = iCat.Model.__pageData[vid] = {};
-				IMData.ownData = {};
-			}
+			IMData = iCat.Model.__pageData[vid] = iCat.Model.ViewData(vid) || {};
+			IMData.ownData = {};
 
 			iCat.foreach(opt, function(k, v){
 				if(iCat.isFunction(v)){//option中的方法
@@ -140,14 +324,16 @@
 
 		_render: function(data, before, clear, outData){
 			var self = this, vid = self.viewId, ret1, ret2,
-				IMData = iCat.Model.__pageData[vid],
+				IMData = iCat.Model.ViewData(vid),
 				ownData = IMData.ownData,
 				curCfg = IMData.config,
-				curWrap = iCat.util.queryOne(curCfg.wrap || curCfg.scrollWrap, iCat.elCurWrap);
+				curWrap = iCat.util.queryOne(curCfg.wrap || curCfg.scrollWrap, iCat.elCurWrap),
+				nodes = iCat.util.queryAll('*[data-unclass='+self.viewId+'-loaded]', curWrap);
 			
-			if(self.model._dataChange(vid, data) ||//数据发生变化
-				iCat.singleMode ||//单层切换
-					!iCat.util.queryAll('*[data-unclass='+self.viewId+'-loaded]', curWrap).length){//对应子元素为空(fixed bug: 同init函数不同hash无法渲染)
+			if(self.model._dataChange(vid, data)//数据发生变化
+				|| iCat.singleMode//单层切换
+					|| !nodes.length)//对应子元素为空(fixed bug: 同init函数不同hash无法渲染)
+			{
 				if(outData){//设置setData得到的数据
 					ret1 = self.model.save(curCfg, data);
 					if(!!ret1 && iCat.isArray(ret1))
@@ -169,7 +355,7 @@
 
 		_htmlRender: function(data, before, clear){
 			var self = this,
-				IMData = iCat.Model.__pageData[self.viewId],
+				IMData = iCat.Model.ViewData(self.viewId),
 				cfg = IMData.config;
 
 			if(!data && self.model){
@@ -188,8 +374,9 @@
 
 		setModel: function(m, data, before, clear){
 			var self = this;
-			if(!m || (iCat.isObject(m) && m.constructor.__super__!==Model))
+			if(!m || (iCat.isObject(m) && m.constructor.__super__!==Model)){
 				m = iCat.Model['__page_emptyModel'] || new Model('__page_emptyModel');
+			}
 			if(!self.model){//第一次
 				self.model = m;
 				if(self.init)//自定义初始化
@@ -230,22 +417,12 @@
 		}
 	};
 	Model.prototype = {
-		_cfgChange: function(vid, cfg){
-			return iCat.Model.cfgChange(vid, cfg);
-		},
-		_dataChange: function(vid, data){
-			return iCat.Model.dataChange(vid, data);
-		},
+		_cfgChange: function(vid, cfg){ return iCat.Model.cfgChange(vid, cfg); },
+		_dataChange: function(vid, data){ return iCat.Model.dataChange(vid, data); },
 
-		fetch: function(){
-			iCat.util.fetch.apply(this, arguments);
-		},
-		save: function(){
-			return iCat.util.save.apply(this, arguments);
-		},
-		remove: function(){
-			iCat.util.remove.apply(this, arguments);
-		}
+		fetch: function(){ iCat.util.fetch.apply(this, arguments); },
+		save: function(){ return iCat.util.save.apply(this, arguments); },
+		remove: function(){ iCat.util.remove.apply(this, arguments); }
 	};
 
 	/*
@@ -253,7 +430,6 @@
 	 * - 响应用户动作，调用对应的View处理函数
 	 * - 每次extend都会生成一个新的controller-Class
 	 */
-	var Event = iCat.Event;
 	var	Controller = function(ctrlId, option){
 		option = option || {};
 
@@ -263,8 +439,7 @@
 		self.routes = option.routes || {};
 
 		self.vmGroups = {};// key=viewId, value=modelId
-		self.wraps = [];// value=modHash
-		self.selectors = [];
+		self.wrapGroup = [];// value=modHash
 
 		self._init(ctrlId, option, self.config);
 	};
@@ -295,253 +470,75 @@
 					iCat.foreach(wraps, function(w){
 						iCat.util.makeHtml(cfg.adjustLayout, w);
 					});
-				}
-				else {
+				} else {
 					iCat.util.makeHtml(cfg.adjustLayout);
 				}
 			}
 			
-			iCat.util.wait(function(k){// fixed bug:合并状态下，js加载过快，会导致无法得到bodyWrap
-				if(!iCat.elBodyWrap){
+			iCat.util.wait(function(k, t){
+				var bodyNode = iCat.elBodyWrap || iCat.util.queryOne('*[data-pagerole=body]');
+				if(!bodyNode){
 					iCat.__cache_timers[k] = false;
-					return;
+					if(t!=200) return;
 				}
 				delete iCat.__cache_timers[k];
 
+				iCat.elBodyWrap = iCat.elBodyWrap || doc.body;
 				bodyId = iCat.elBodyWrap.getAttribute('id');
+				var fnInit = function(id){
+					var hash = tools.dealHash(id, self.routes);
+					self.hashArgus = hash;
+					try{
+						self.routes[hash[0]].call(self);
+					}
+					catch(e){}
+				};
 
-				//页面里没有id属性，则为锚点hash
-				if(iCat.isNull(bodyId)){
-					root['onhashchange'] = function(){
-						var hash = tools.dealHash(location.hash, self.routes);
-						self.hashArgus = hash;
-						self.pseudoInit = true;
-						try{ self.routes[hash[0]].call(self); } catch(e){}
-					};
+				if(iCat.isNull(bodyId)){//页面里没有id属性，则为锚点hash
+					fnInit(location.hash);
+					root['onhashchange'] = function(){ fnInit(location.hash); };
+				} else{
+					iCat.mode_multiPage = true;
+					fnInit(bodyId);
 				}
-
-				var hash = tools.dealHash(bodyId || location.hash, self.routes);
-				self.hashArgus = hash;
-				try{ self.routes[hash[0]].call(self); } catch(e){}
-			}, 500, 10);
+			}, 200, 10);
 		},
 
 		init: function(o){
 			var self = this,
 				cfg = self.config,
-				argus = self.hashArgus,
-				curWrap, curPid = argus[0], curCla = cfg.currentCla || 'icat-current-wrap',
-				singleSele = o.singleBed || cfg.singleBed,
-				page1, page2;
+				bedSele = o.baseBed || cfg.baseBed;
 
-			// clear
-			self.modsLoad_mode = false;
-			if(self.routes.scrollWrap)
-				delete self.routes.scrollWrap;
-			if(iCat.elCurWrap){
-				iCat.util.addClass(iCat.elCurWrap, '__prev_baseBed');
-				iCat.util.removeClass(iCat.elCurWrap, curCla);
-				iCat.elCurWrap = null;
-			}
-
-			// 设置操作层
-			if(o.baseBed){
-				curWrap = iCat.elCurWrap = iCat.util.queryOne(o.baseBed);
-				iCat.util.addClass(curWrap, curCla);
-				delete o.baseBed;
-			}
-			else if(cfg.baseBed){
-				var wraps = iCat.util.queryAll(cfg.baseBed);
-				if(!wraps.length) return;
-				if(!self.wraps.contains(curPid)){
-					if(wraps.length==self.wraps.length){
-						page1 = iCat.util.queryOne('.__prev_baseBed');
-						iCat.util.removeClass(page1, '__prev_baseBed');
-						iCat.util.addClass(page1, curCla);
-						console.log('The beds are not enough.');
-						return;
-					}
-					curWrap = iCat.elCurWrap = wraps[self.wraps.length];
-					self.wraps.push(curPid);
-				} else {
-					curWrap = iCat.elCurWrap = wraps[self.wraps.indexOf(curPid)];
-				}
-				iCat.util.addClass(curWrap, curCla);
-			}
-			else if(singleSele) {// fixed bug:会影响到没有使用mvc的页面
-				iCat.singleMode = true;
-				curWrap = iCat.util.queryOne(singleSele);
-				if(!curWrap){
-					var singleHtml = iCat.util.zenCoding('div'+singleSele),
-						w = doc.createElement('wrap'),
-						nodes;
-					w.innerHTML = singleHtml;
-					nodes = w.childNodes;
-					while(nodes.length){
-						iCat.elBodyWrap.insertBefore(nodes[0], iCat.elBodyWrap.firstChild);
-					}
-					iCat.elCurWrap = curWrap = iCat.util.queryOne(singleSele);
-				} else {
-					iCat.elCurWrap = curWrap;
-				}
-			}
-			else return;
-
-			// 设置外来ajax
-			if(o.setAjax){
-				delete iCat.util.ajax;
-				iCat.rentAjax(o.setAjax[0], o.setAjax[1]);
-			}
-
-			// 操作层切换动画接口
-			page1 = iCat.util.queryOne('.__prev_baseBed');
-			page2 = iCat.elCurWrap;
-			if(o.switchPage) o.switchPage(page1, page2);
-			if(page1) iCat.util.removeClass(page1, '__prev_baseBed');
-
-			// 调整结构
-			if(o.adjustLayout){
-				iCat.util.makeHtml(o.adjustLayout, curWrap, iCat.singleMode);
-				delete o.adjustLayout;
-			}
-
-			// 模块化加载模式
-			if(o.modules){
-				self.pageMods = o.modules.trim().split(/\s*,\s*/);// fixed bug:前后有空格，模块加载失败
-				self.modsLoad_mode = !!self.pageMods.length;
-				delete o.modules;
-			}
-
-			if(o.vmGroups) o = o.vmGroups;
-
-			// page render
-			self.vmClear();
-			self.vmAdd(o, true);
-			self.modsLoad_mode? self._modsLoad() : self._commLoad();
-			delete o;
-
-			if(self.pseudoInit){//伪初始化需重新激活
-				iCat.ctrlAble(self);
-				delete self.pseudoInit;
-			}
-		},
-
-		// type: 0=common, 1=height-load, 2=scroll-load
-		_serialize: function(type, mh, wh){
-			if(!this.pageMods.length || !this.pageMods[0]) return;
-
-			var self = this,
-				fn = arguments.callee, vid = self.pageMods[0],
-				curView = iCat.View[vid], modelId = self.vmGroups[vid],
-				IMData = iCat.Model.__pageData[vid],
-				cfg;
-			if(!curView || !IMData){// fixed bug:某个模块请求失败，影响后续加载
-				self.pageMods.shift();
-				fn.apply(self, arguments);
-				return;
-			}
-
-			cfg = IMData.config;
-			switch(type){
-				case 0:
-					cfg.loadCallback = function(node){
-						self.pageMods.shift();
-						if(node) iCat.util.unwrap(node);
-						fn.call(self, 0);
-					};
-					curView.setModel(iCat.Model[modelId]);
-				break;
-
-				case 1:
-					cfg.loadCallback = function(node){
-						self.pageMods.shift();
-						if(node){
-							mh = mh + iCat.util.outerHeight(node);
-							iCat.util.unwrap(node);
-						}
-						if(mh<=wh+20 && self.pageMods.length){
-							fn.call(self, 1, mh, wh);
-						} else if(self.pageMods.length){
-							iCat.util.scroll(
-								self.routes.scrollWrap,
-								function(slHeight, slTop, spHeight){
-									if(!self.pageMods.length) return;
-									if(slTop+slHeight+50>=spHeight){
-										fn.call(self, 2);
-									}
-								}
-							);
-						}
-					};
-					curView.setModel(iCat.Model[modelId]);
-				break;
-
-				case 2:
-					if(curView.loaded==undefined){//拒绝重复
-						curView.loaded = false;
-						cfg.loadCallback = function(node, blankHtml){
-							self.pageMods.shift();
-							curView.loaded = true;
-							if(node) iCat.util.unwrap(node);
-							if(blankHtml) fn.call(self, 2);
-						};
-						curView.setModel(iCat.Model[modelId]);
-					}
-				break;
-			}
-		},
-
-		_modsLoad: function(){// 模块化加载
-			var self = this;
-
-			// 初始化页面
-			if(self.routes.scrollWrap){// 滚动加载
-				var winHeight = iCat.util.outerHeight(root),
-					modsHeight = 0;
-				self._serialize(1, modsHeight, winHeight);
+			if(iCat.mode_multiPage){
+				iCat.elCurWrap = iCat.util.queryOne(bedSele);
+				tools.multiPage(self, o);
 			} else {
-				if(self.pageMods.length){
-					self._serialize(0);
+				if(o.adjustLayout){
+					iCat.util.makeHtml(o.adjustLayout, curWrap, iCat.mode_singleLayer);
+					delete o.adjustLayout;
 				}
-			}
-		},
 
-		_commLoad: function(){// 普通加载
-			var self = this;
-			iCat.foreach(self.vmGroups, function(vid, mid){
-				curView = iCat.View[vid], curModel = iCat.Model[mid];
-				curView.setModel(curModel);
-			});
-		},
+				if(iCat.mode_singleLayer){
+					tools.singleLayer(self, o);
+				} else {
+					if(iCat.mode_multiLayer){
+						tools.multiLayer(self, o);
+					} else {
+						var wraps = self.pageWraps = iCat.util.queryAll(bedSele),
+							len = wraps.length;
+						if(!len) return;
 
-		_subscribe: function(events, disabled){//events参数同Event.delegate
-			var self = this;
-			iCat.util.recurse(events, function(o){
-				o.selector = o.selector.trim().replace(/\s+/g, ' ');
-				Event.delegate(o, disabled);
-				if(!self.selectors.contains(o.selector)){
-					self.selectors.push(o.selector);
-					Event.__event_selectors.push(o.selector);
+						if(len==1){
+							iCat.mode_singleLayer = true;
+							iCat.elCurWrap = wraps[0];
+							tools.singleLayer(self, o);
+						}
+						else {
+							iCat.mode_multiLayer = true;
+							tools.multiLayer(self, o);
+						}
+					}
 				}
-			});
-		},
-
-		_regEvents: function(view, disabled){// bind-events
-			var self = this,
-				vid = view.viewId,
-				events = iCat.Model.__pageData[vid].config.events;
-			if(events){
-				iCat.util.recurse(events, function(e){
-					//此处如果直接e.callback=f，e.callback已被替换，无法找到函数
-					var fn = e.callback;
-					if(iCat.isString(fn)) fn = view[e.callback];
-					e.callback = function(){
-						var argus = tools.toArray(arguments); //step2
-							argus.unshift(view, view.model, iCat.Model.__pageData[view.viewId].config);//普通方法追加view, model, config
-						fn.apply(this, argus);
-					};
-					self._subscribe(e, disabled);
-				});
 			}
 		},
 
@@ -570,7 +567,8 @@
 						item.view.setting || {'__page_mainView': {config:{}}},// default= '__page_mainView'
 						function(key, setItem){
 							if(init && self.pageMods && !self.pageMods.contains(key)) return;
-							var curView = iCat.View[key] || new item.view(key, setItem);
+							var curView = iCat.View[key] || new item.view(key, setItem),
+								cfg = setItem.config;
 							if(!vmGroups[key]){
 								if(init){//(伪)初始化时
 									if(curView.model){
@@ -588,15 +586,15 @@
 								}
 							}
 
-							if(setItem.config.scrollWrap || self.config.scrollWrap)
-								self.routes.scrollWrap = self.config.scrollWrap || setItem.config.scrollWrap;
-							self._regEvents(curView, init);
+							if(cfg.scrollWrap || self.config.scrollWrap)
+								self.routes.scrollWrap = self.config.scrollWrap || cfg.scrollWrap;
+							tools.regEvents(curView, cfg);
 						}
 					);
 				} else {
 					var curView = item.view,
 						key = curView.viewId,
-						cfg = iCat.Model.__pageData[curView.viewId].config;
+						cfg = iCat.Model.ViewData(curView.viewId).config;
 					if(!vmGroups[key]){
 						if(init){//(伪)初始化时
 							if(curView.model){
@@ -613,7 +611,7 @@
 							vmGroups[key] = item.model.modelId;
 						}
 					}
-					self._regEvents(curView, init);
+					tools.regEvents(curView, cfg);
 				}
 			});
 		},
@@ -625,12 +623,15 @@
 			if(iCat.isString(vid) && vid.indexOf(',')<0){
 				var vmGroups = self.vmGroups;
 				if(vmGroups[vid]){
-					var events = iCat.Model.__pageData[vid].config.events;
+					var events = iCat.Model.ViewData(vid).config.events;
 					if(events){
-						iCat.util.recurse(events, function(o){
-							Event.undelegate(o);
-							if(self.selectors.contains(o.selector)){
-								self.selectors.remove(o.selector);
+						iCat.util.recurse(events, function(e){
+							if(iCat.Event)
+								iCat.Event.undelegate(e);
+							else if(iCat.$ && iCat.$.event){
+								e.type = e.type.replace(/!/g, '')
+											   .replace(/(long|single)?tap/gi, 'click');
+								iCat.$(iCat.elCurWrap).undelegate(e.selector, e.type);
 							}
 						});
 					}
@@ -640,7 +641,7 @@
 				var fn = arguments.callee;
 				vid = iCat.isString(vid)? vid.split(',') : vid;
 				iCat.isArray(vid)?// fixed bug:当调用fn时，其中的this指向window
-					vid.forEach(function(k){fn.call(self, k);}) : iCat.foreach(vid, function(k){fn.call(self, k);});
+					vid.forEach(function(k){fn.call(self, k);}) :iCat.foreach(vid, function(k){fn.call(self, k);});
 			}
 		},
 
@@ -657,7 +658,7 @@
 	iCat.Model['__pageData'] = iCat.Model['__pageData'] || {};
 	iCat.mix(iCat.Model, {
 		cfgChange: function(vid, d){
-			var oldCfg = iCat.Model.__pageData[vid].config,
+			var oldCfg = iCat.Model.ViewData(vid).config,
 				ret = (d.ajaxUrl && oldCfg.ajaxUrl!=d.ajaxUrl) ||
 					  (d.tempId && oldCfg.tempId!=d.tempId) ||
 					  (d.wrap && oldCfg.wrap!=d.wrap);
@@ -666,9 +667,9 @@
 		},
 
 		dataChange: function(vid, d){
-			var oldData = iCat.Model.__pageData[vid].prevData,
-				ret = !iCat.util._jsonCompare(d, oldData);
-			iCat.Model.__pageData[vid].prevData = JSON.stringify(d);
+			var prevData = iCat.Model.ViewData(vid).prevData,
+				ret = !iCat.util._jsonCompare(d, prevData);
+			prevData = JSON.stringify(d);
 			return ret;
 		},
 
@@ -676,31 +677,12 @@
 			var GD = iCat.Model.__globalData = iCat.Model.__globalData || {};
 			if(!d) return GD[key];
 			if(!GD[key]) GD[key] = d;
-		}
-	});
-
-	iCat.mix(iCat, {
-		ctrlAble: function(arrCtrl, callback){
-			if(!arrCtrl) return;
-			arrCtrl = iCat.isArray(arrCtrl) ? arrCtrl : [arrCtrl];
-			arrCtrl.forEach(function(item){
-				Event.__event_selectors = Event.__event_selectors.concat(item.selectors);
-				Event.__event_selectors.unique();
-			});
-			if(callback && iCat.isFunction(callback)){
-				callback();
-			}
 		},
 
-		ctrlDisable: function(arrCtrl){
-			if(!arrCtrl) return;
-			arrCtrl = iCat.isArray(arrCtrl) ? arrCtrl : [arrCtrl];
-			arrCtrl.forEach(function(item){
-				item.selectors.forEach(function(v){
-					delete Event.items[v];
-					Event.__event_selectors.remove(v);
-				});
-			});
+		ViewData: function(vid, d){
+			var PD = iCat.Model.__pageData = iCat.Model.__pageData || {};
+			if(!d) return PD[vid];
+			if(!PD[vid]) PD[vid] = d;
 		}
 	});
 })(ICAT, this, document);

@@ -147,6 +147,12 @@
 			}
 			return false;
 		},
+
+		toArray: function(oArr){
+			var arr = [];
+			iCat.foreach(oArr, function(i,v){ arr.push(v); });
+			return arr;
+		},
 		
 		// Handles objects with the built-in 'foreach', arrays, and raw objects.
 		foreach: function(o, cb, args){
@@ -344,9 +350,8 @@
 			(fn = function(){
 				callback(key, steps);
 				if(steps<delay && cacheTimer[key]===false){
-					var timer = setTimeout(function(){
+					setTimeout(function(){
 						steps = steps + step;
-						clearTimeout(timer);
 						fn();
 					}, step);
 				}
@@ -410,7 +415,7 @@
 		},
 
 		scroll: Sutil.scroll || function(box, callback){
-			var me = iCat.isString(box)? iCat.util.queryOne(box) : box,
+			var me = iCat.isString(box)? iCat.util.queryOne(box, iCat.elCurWrap) : box,
 				o, nodes, isBody;
 
 			me = me.nodeType!==1? doc.body : me;
@@ -458,11 +463,12 @@
 		queryAll: Sutil.queryAll || function(selector, context){
 			if(!selector) return [];
 			return iCat.isString(selector)?
-					(context || iCat.elCurWrap || iCat.elBodyWrap || doc).querySelectorAll(selector) : selector;
+					(context || iCat.elBodyWrap || doc).querySelectorAll(selector) : selector;
 		},
 
 		queryOne: Sutil.queryOne || function(selector, context){
-			if(!selector) return;
+			if(iCat.isUndefined(selector)) return;
+			if(selector==='') return iCat.elCurWrap;
 			if(iCat.isString(selector)){
 				selector = /\:[\d]+/.test(selector)?
 					selector.replace(/(\:[\d]+).*/g, '$1').split(':') : [selector];
@@ -634,6 +640,13 @@
 							p.insertBefore(nodes[0], el);
 						}
 						p.removeChild(el);
+					},
+
+					clearHtml: function(pNode){
+						var nodes = pNode.childNodes;
+						while(nodes.length){
+							pNode.removeChild(nodes[0]);
+						}
 					}
 				};
 			},
@@ -745,12 +758,11 @@
 			},
 
 			_makeHtml: function(items, pNode, clear){
-				if(!items || !iCat.isString(items)) return;
-
 				var p = pNode, o, shtml;
 				if(!p) return;
 
-				if(clear) p.innerHTML = '';
+				if(clear)
+					iCat.util.clearHtml(p);
 				if(!p.childNodes.length){//拒绝重复
 					shtml = iCat.util.zenCoding(items);
 					o = doc.createElement('wrap');
@@ -793,7 +805,7 @@
 					render: function(cfg, data, before, clear){
 						if(cfg && data){
 							var w = cfg.scrollWrap || cfg.wrap,
-								pWrap = iCat.util.queryOne(w);
+								pWrap = iCat.util.queryOne(w, iCat.elCurWrap);
 							iCat.isjQueryObject(pWrap) && (pWrap = pWrap[0]);
 
 							//兼容old-api
@@ -841,10 +853,7 @@
 						//辞旧
 						if(cfg.onlyChild===undefined) cfg.onlyChild = true;
 						if(clear || (iCat.singleMode && cfg.onlyChild)){
-							var nodes = pWrap.childNodes;
-							while(nodes.length){
-								pWrap.removeChild(nodes[0]);
-							}
+							iCat.util.clearHtml(pWrap);
 						}
 
 						//迎新
@@ -916,7 +925,8 @@
 						var keyStorage,
 							IMData = cfg.viewId? iCat.Model.__pageData[cfg.viewId] : {},
 							ownData = IMData.ownData,
-							online = navigator.onLine==true;
+							online = navigator.onLine==true,
+							hasGData = !!cfg.globalKey && iCat.Model.GlobalData(cfg.globalKey);
 
 						//兼容old-api
 						cfg.dataSave = cfg.isSave!==undefined? cfg.isSave : cfg.dataSave;
@@ -928,7 +938,7 @@
 							keyStorage = (cfg.viewId || cfg.tempId) + cfg.dataKey;
 						}
 
-						if(online && cfg.ajaxUrl){
+						if(online && cfg.ajaxUrl && !hasGData){
 							oSelf._ajaxFetch(cfg, callback, ownData, keyStorage);
 						}
 						else {
@@ -1214,9 +1224,12 @@
 				
 				repeatKeys = repeatKeys? JSON.parse(repeatKeys) : {};
 				_key = key.replace(/repeat_\d+.*/gi, '');
-				if(repeatKeys[_key]===undefined || overwrite){//第一次或可以覆盖
+				if(iCat.isUndefined(repeatKeys[_key])//第一次
+					|| (repeatKeys[_key]===false && iCat.isNull(iCat.util.storage(key)))//已被删除
+						|| overwrite)//可以覆盖
+				{
 					iCat.util.storage(key, data);
-					if(repeatKeys[_key]===undefined){
+					if(iCat.isUndefined(repeatKeys[_key])){
 						repeatKeys[_key] = false;
 						iCat.util.storage('repeatKeys', repeatKeys);
 					}

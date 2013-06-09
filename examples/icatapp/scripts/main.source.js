@@ -2,11 +2,12 @@
 	iCat.app('App', function(){
 		iCat.PathConfig();
 		return {
-			version: '1.0'
+			version: '1.0',
+			init: function(){
+				iCat.include(['lib/jquery.js', './mvc.source.js'], null, true);
+			}
 		}
 	});
 
-	iCat.include('lib/jquery.js', function(){
-		iCat.include('./mvc.source.js');
-	});
+	App.init();
 })(ICAT);

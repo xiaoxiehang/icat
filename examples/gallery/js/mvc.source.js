@@ -92,5 +92,5 @@
 	});
 
 	//start
-	iCat.ctrlAble(new mainCtrl('mc'));
+	new mainCtrl('mc');
 })(ICAT);

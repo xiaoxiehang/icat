@@ -6,7 +6,7 @@
 			wrap: '#backbone-menu',
 			ajaxUrl: 'Backboneapp_data.php',
 			globalKey:'pageData',
-			repeatOverwrite: true,
+			overwrite: true,
 			callback: function(p, cfg){
 				$('.active').removeClass('active');
 				$('#item' + cfg.curId).addClass('active');
@@ -18,7 +18,7 @@
 		config: {
 			tempId: 'content-tmpl',
 			wrap: '#backbone-content',
-			repeatOverwrite: true,
+			overwrite: true,
 			globalKey:'pageData'
 		}
 	});
@@ -40,6 +40,7 @@
 
 	//ctrl
 	var pageCtrl = iCat.Controller.extend({
+		config: {baseBed: '#content'},
 		routes: {
 			' ': 'defaultRoute',
 			'info/:id': 'infoShow'
@@ -57,8 +58,7 @@
 				vmGroups: [
 					{view: new menuView('menu', {config:{curId:itemId}}), model: pageModel},
 					{view: new mainView('main', {config:{globalArgus:[itemId]}}), model: pageModel}
-				],
-				baseBed: '#content'
+				]
 			});
 		}
 	});
