@@ -224,13 +224,12 @@ test('template engine', function(){
 		},
 		ajaxUrl: 'src/abc.php',
 		dataSave: true,
-		//overwrite: true,
-		//onlyChild: true,
+		multiChild: true,
 		callback: function(){}
 	};
 
-	/*iCat.util.fetch(cfg, function(data){
+	iCat.util.fetch(cfg, function(data){
 		//iCat.log(data);
 		iCat.util.render(cfg, data);
-	});*/
+	});
 });

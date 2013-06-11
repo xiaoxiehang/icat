@@ -14,7 +14,6 @@
 	var View = iCat.View.extend({
 		config: {
 			wrap: '',
-			repeatOverwrite: true,
 			ajaxUrl:'data/album.php',
 			globalKey:'pageData'
 		}

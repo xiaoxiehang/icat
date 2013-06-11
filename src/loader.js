@@ -248,7 +248,7 @@
 				}
 
 				pNode.appendChild(node);
-				if(type==='js'){
+				if(type==='js' && !/target\-script\-min/i.test(_url)){
 					setTimeout(function(){
 						pNode.removeChild(node);
 					},10);
@@ -407,9 +407,10 @@
 	iCat.weinreStart = function(){
 		if(!iCat.PathConfig.weinreRef) return;
 
-		var whash = iCat.util.cookie('__w_hash') || '';
-		if(location.hash && !whash){
-			iCat.util.cookie('__w_hash', location.hash, 3600);
+		var whash = iCat.util.cookie('__w_hash') || '#anonymous',
+			curHash = location.hash;
+		if(curHash && /^#[^\W]+$/.test(curHash) && !whash){//忽略单页面中的hash
+			iCat.util.cookie('__w_hash', curHash, 3600);
 		}
 		var weinrejs = iCat.PathConfig.weinreRef + 'target/target-script-min.js!' + whash;
 		iCat.include(weinrejs);// fixed bug:用inc当js无法加载时，会阻碍页面渲染

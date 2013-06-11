@@ -514,18 +514,6 @@
 			
 			//把option合并到self
 			iCat.mix(self, opt, 'config, routes');
-
-			//全局调整结构
-			if(cfg.adjustLayout){
-				if(iCat.isString(cfg.adjustLayout) && cfg.baseBed){
-					var wraps = iCat.util.queryAll(cfg.baseBed);
-					iCat.foreach(wraps, function(i, w){
-						iCat.util.makeHtml(cfg.adjustLayout, w);
-					});
-				} else {
-					iCat.util.makeHtml(cfg.adjustLayout);
-				}
-			}
 			
 			iCat.util.wait(function(k, t){
 				var bodyNode = iCat.elBodyWrap || iCat.util.queryOne('*[data-pagerole=body]');
@@ -533,9 +521,22 @@
 					iCat.__cache_timers[k] = false;
 					if(t!=200) return;
 				}
-				delete iCat.__cache_timers[k];
 
+				delete iCat.__cache_timers[k];
 				iCat.elBodyWrap = iCat.elBodyWrap || doc.body;
+
+				//全局调整结构
+				if(cfg.adjustLayout){
+					if(iCat.isString(cfg.adjustLayout) && cfg.baseBed){
+						var wraps = iCat.util.queryAll(cfg.baseBed);
+						iCat.foreach(wraps, function(i, w){
+							iCat.util.makeHtml(cfg.adjustLayout, w);
+						});
+					} else {
+						iCat.util.makeHtml(cfg.adjustLayout);
+					}
+				}
+				
 				bodyId = iCat.elBodyWrap.getAttribute('id');
 				var fnInit = function(id){
 					var hash = tools.dealHash(id, self.routes);
