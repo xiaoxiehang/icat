@@ -4,7 +4,10 @@ ICAT是由[@jndream](http://weibo.com/jndream)发起创建的一个开源JS袖�
 
 It's Concise,Agile,Thin...
 
-ICAT = kissy(part) + Event + (underscore&backbone) + seajs
+ICAT简单的“换算关系”:
+- [underscore&backbone] = core.js + mvc.js
+- [seajs] = core.js + loader.js
+- mobile-event = core.js + event.js
 
 官网地址：[http://demo.3gtest.gionee.com/vkicat/index.php](http://demo.3gtest.gionee.com/vkicat/index.php)。
 
