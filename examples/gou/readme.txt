@@ -1,3 +1,3 @@
-mode1£º¶àÒ³Ãæ id×÷Îªhash
-mode2£ºµ¥Ò³Ãæ ¶à¸öÒÑÓÐµÄ»òµ÷Õû½á¹¹Éú³ÉµÄwrapsÇÐ»»
-mode3£ºµ¥Ò³Ãæ µ¥¸öwrapÉÏ¡°²Á³ý-äÖÈ¾¡±
+æ¨¡å¼ä¸€ï¼ˆindex.phpï¼‰: å¤šé¡µé¢åˆ‡æ¢
+æ¨¡å¼äºŒï¼ˆindexmode2.phpï¼‰: å•é¡µé¢å¤šå±‚åˆ‡æ¢
+æ¨¡å¼ä¸‰ï¼ˆindexmode3.phpï¼‰ï¼šå•é¡µé¢å•å±‚æ¸…é™¤åŽæ¸²æŸ“
