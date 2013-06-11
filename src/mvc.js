@@ -80,6 +80,49 @@
 					}
 				},
 
+				addItem: function(vmGroups, curView, model, init){
+					var key = curView.viewId;
+					if(!vmGroups[key]){
+						if(init){//(伪)初始化时
+							if(curView.model){
+								delete curView.model;
+							} else {
+								if(!model){
+									model = iCat.Model['__page_emptyModel'] || new Model('__page_emptyModel');
+								}
+							}
+							vmGroups[key] = model.modelId;
+						}
+						else if(model){
+							curView.setModel(model);
+							vmGroups[key] = model.modelId;
+						}
+						else {
+							vmGroups[key] = '__page_emptyModel';
+						}
+					}
+				},
+
+				removeItem: function(vmGroups, vid){
+					if(!iCat.isString(vid) || vid.indexOf(',')>0) return;
+					
+					if(vmGroups[vid]){
+						var events = iCat.Model.ViewData(vid).config.events;
+						if(events){
+							iCat.util.recurse(events, function(e){
+								if(iCat.Event)
+									iCat.Event.undelegate(e);
+								else if(iCat.$ && iCat.$.event){
+									e.type = e.type.replace(/!/g, '')
+												   .replace(/(long|single)?tap/gi, 'click');
+									iCat.$(iCat.elCurWrap).undelegate(e.selector, e.type);
+								}
+							});
+						}
+						delete vmGroups[vid];
+					}
+				},
+
 				regEvents: function(view, cfg){// bind-events
 					if(cfg.events){
 						iCat.util.recurse(cfg.events, function(e){
@@ -116,7 +159,7 @@
 				singleLayer: function(c, o){
 					// clear
 					if(c.modsLoad_mode) delete c.modsLoad_mode;
-					if(c.routes.scrollWrap) delete c.routes.scrollWrap;
+					if(c.routes.scrollBox) delete c.routes.scrollBox;
 					c.vmClear();
 
 					oSelf._baseInit(c, o);
@@ -131,7 +174,8 @@
 					
 					// clear
 					if(c.modsLoad_mode) delete c.modsLoad_mode;
-					if(c.routes.scrollWrap) delete c.routes.scrollWrap;
+					if(c.routes.scrollBox) delete c.routes.scrollBox;
+					if(iCat.hashChange) delete iCat.hashChange;
 					c.vmClear();
 					if(iCat.elCurWrap){
 						iCat.util.addClass(iCat.elCurWrap, '__prev_baseBed');
@@ -148,6 +192,7 @@
 							console.log('The beds are not enough.');
 							return;
 						}
+						iCat.hashChange = true;
 						curWrap = iCat.elCurWrap = wraps[curGroup.length];
 						curGroup.push(curPid);
 					} else {
@@ -162,6 +207,11 @@
 					if(page1) iCat.util.removeClass(page1, '__prev_baseBed');
 
 					oSelf._baseInit(c, o);
+				},
+
+				pageLoad: function(c){
+					c.pageMods && c.pageMods.length?
+						oSelf._modsLoad(c) : oSelf._commLoad(c);
 				}
 			};
 		},
@@ -173,98 +223,97 @@
 
 			// page set
 			if(o.baseBed) delete o.baseBed;
+			if(cfg.scrollBox) c.routes.scrollBox = cfg.scrollBox;
 
+			if(o.scrollBox){
+				c.routes.scrollBox = o.scrollBox;
+				delete o.scrollBox;
+			}
 			if(o.setAjax){
 				delete iCat.util.ajax;
 				iCat.rentAjax(o.setAjax[0], o.setAjax[1]);
 			}
 			if(o.modules){
-				c.pageMods = o.modules.replace(/\s+/, '').split(',');// fixed bug:前后有空格，模块加载失败
-				c.modsLoad_mode = !!c.pageMods.length;
+				c.pageMods = o.modules.replace(/\s+/g, '').split(',');// fixed bug:前后有空格，模块加载失败
 				delete o.modules;
 			}
 
 			if(o.vmGroups) o = o.vmGroups;
 
-			// page render
+			// add init-vm
 			c.vmAdd(o, true);
-			c.modsLoad_mode? this._modsLoad(c) : this._commLoad(c);
-		},
-
-		// type: 0=common, 1=height-load, 2=scroll-load
-		__serialize: function(c, type, mh, wh){
-			if(!c.pageMods.length || !c.pageMods[0]) return;
-
-			var fn = this._serialize, vid = c.pageMods[0],
-				curView = iCat.View[vid], modelId = c.vmGroups[vid],
-				IMData = iCat.Model.ViewData(vid),
-				cfg;
-			if(!curView || !IMData){// fixed bug:某个模块请求失败，影响后续加载
-				c.pageMods.shift();
-				fn.apply(c, arguments);
-				return;
-			}
-
-			cfg = IMData.config;
-			switch(type){
-				case 0:
-					cfg.loadCallback = function(node){
-						c.pageMods.shift();
-						if(node) iCat.util.unwrap(node);
-						fn.call(c, 0);
-					};
-					curView.setModel(iCat.Model[modelId]);
-				break;
-
-				case 1:
-					cfg.loadCallback = function(node){
-						c.pageMods.shift();
-						if(node){
-							mh = mh + iCat.util.outerHeight(node);
-							iCat.util.unwrap(node);
-						}
-						if(mh<=wh+20 && c.pageMods.length){
-							fn.call(c, 1, mh, wh);
-						} else if(c.pageMods.length){
-							iCat.util.scroll(
-								c.routes.scrollWrap,
-								function(slHeight, slTop, spHeight){
-									if(!c.pageMods.length) return;
-									if(slTop+slHeight+50>=spHeight){
-										fn.call(c, 2);
-									}
-								}
-							);
-						}
-					};
-					curView.setModel(iCat.Model[modelId]);
-				break;
-
-				case 2:
-					if(curView.loaded==undefined){//拒绝重复
-						curView.loaded = false;
-						cfg.loadCallback = function(node, blankHtml){
-							c.pageMods.shift();
-							curView.loaded = true;
-							if(node) iCat.util.unwrap(node);
-							if(blankHtml) fn.call(c, 2);
-						};
-						curView.setModel(iCat.Model[modelId]);
-					}
-				break;
-			}
 		},
 
 		_modsLoad: function(c){// 模块化加载
 			var self = this;
-			if(c.routes.scrollWrap){// 滚动加载
-				var winHeight = iCat.util.outerHeight(root),
-					modsHeight = 0;
-				self.__serialize(c, 1, modsHeight, winHeight);
-			} else {
-				if(c.pageMods.length){
-					self.__serialize(c, 0);
+
+			// type: 0=common, 1=height-load, 2=scroll-load
+			var fn = function(type, mh, wh){
+				if(!c.pageMods.length || !c.pageMods[0]) return;
+
+				var vid = c.pageMods[0],
+					curView = iCat.View[vid], modelId = c.vmGroups[vid],
+					IMData = iCat.Model.ViewData(vid),
+					cfg = (IMData || {}).config;
+				if(!curView || !IMData){// fixed bug:某个模块请求失败，影响后续加载
+					c.pageMods.shift();
+					fn(c, arguments);
+					return;
 				}
+
+				switch(type){
+					case 0:
+						cfg.loadCallback = function(node){
+							c.pageMods.shift();
+							if(node) iCat.util.unwrap(node);
+							fn(0);
+						};
+						curView.setModel(iCat.Model[modelId]);
+					break;
+
+					case 1:
+						cfg.loadCallback = function(node){
+							c.pageMods.shift();
+							if(node){
+								mh = mh + iCat.util.outerHeight(node);
+								iCat.util.unwrap(node);
+							}
+							if(mh<=wh+20 && c.pageMods.length){
+								fn(1, mh, wh);
+							} else if(c.pageMods.length){
+								iCat.util.scroll(
+									c.routes.scrollBox,
+									function(slHeight, slTop, spHeight){
+										if(!c.pageMods.length) return;
+										if(slTop+slHeight+50>=spHeight){
+											fn(2);
+										}
+									}
+								);
+							}
+						};
+						curView.setModel(iCat.Model[modelId]);
+					break;
+
+					case 2:
+						if(curView.loaded==undefined){//拒绝重复
+							curView.loaded = false;
+							cfg.loadCallback = function(node, blankHtml){
+								c.pageMods.shift();
+								curView.loaded = true;
+								if(node) iCat.util.unwrap(node);
+								if(blankHtml) fn(2);
+							};
+							curView.setModel(iCat.Model[modelId]);
+						}
+					break;
+				}
+			};
+
+			if(c.routes.scrollBox){// 滚动加载
+				fn(1, 0, iCat.util.outerHeight(root));
+			} else {
+				fn(0);
 			}
 		},
 
@@ -326,13 +375,11 @@
 			var self = this, vid = self.viewId, ret1, ret2,
 				IMData = iCat.Model.ViewData(vid),
 				ownData = IMData.ownData,
-				curCfg = IMData.config,
-				curWrap = iCat.util.queryOne(curCfg.wrap || curCfg.scrollWrap, iCat.elCurWrap),
-				nodes = iCat.util.queryAll('*[data-unclass='+self.viewId+'-loaded]', curWrap);
+				curCfg = IMData.config;
 			
-			if(self.model._dataChange(vid, data)//数据发生变化
-				|| iCat.singleMode//单层切换
-					|| !nodes.length)//对应子元素为空(fixed bug: 同init函数不同hash无法渲染)
+			if(self.model.dataChange(vid, data)//数据发生变化
+				|| iCat.hashChange//hash变化(fixed bug: 同init函数不同hash无法渲染)
+					|| iCat.mode_singleLayer)//单层切换
 			{
 				if(outData){//设置setData得到的数据
 					ret1 = self.model.save(curCfg, data);
@@ -389,7 +436,7 @@
 
 		setConfig: function(cfg, before, clear){
 			var self = this;
-			if(self.model._cfgChange(self.viewId, cfg)){
+			if(self.model.cfgChange(self.viewId, cfg)){
 				self._htmlRender(null, before, clear);
 			}
 		},
@@ -417,8 +464,8 @@
 		}
 	};
 	Model.prototype = {
-		_cfgChange: function(vid, cfg){ return iCat.Model.cfgChange(vid, cfg); },
-		_dataChange: function(vid, data){ return iCat.Model.dataChange(vid, data); },
+		cfgChange: function(vid, cfg){ return iCat.Model.cfgChange(vid, cfg); },
+		dataChange: function(vid, data){ return iCat.Model.dataChange(vid, data); },
 
 		fetch: function(){ iCat.util.fetch.apply(this, arguments); },
 		save: function(){ return iCat.util.save.apply(this, arguments); },
@@ -467,7 +514,7 @@
 			if(cfg.adjustLayout){
 				if(iCat.isString(cfg.adjustLayout) && cfg.baseBed){
 					var wraps = iCat.util.queryAll(cfg.baseBed);
-					iCat.foreach(wraps, function(w){
+					iCat.foreach(wraps, function(i, w){
 						iCat.util.makeHtml(cfg.adjustLayout, w);
 					});
 				} else {
@@ -492,6 +539,7 @@
 						self.routes[hash[0]].call(self);
 					}
 					catch(e){}
+					tools.pageLoad(self);
 				};
 
 				if(iCat.isNull(bodyId)){//页面里没有id属性，则为锚点hash
@@ -514,7 +562,7 @@
 				tools.multiPage(self, o);
 			} else {
 				if(o.adjustLayout){
-					iCat.util.makeHtml(o.adjustLayout, curWrap, iCat.mode_singleLayer);
+					iCat.util.makeHtml(o.adjustLayout, iCat.elCurWrap || bedSele, iCat.mode_singleLayer);
 					delete o.adjustLayout;
 				}
 
@@ -532,8 +580,7 @@
 							iCat.mode_singleLayer = true;
 							iCat.elCurWrap = wraps[0];
 							tools.singleLayer(self, o);
-						}
-						else {
+						} else {
 							iCat.mode_multiLayer = true;
 							tools.multiLayer(self, o);
 						}
@@ -569,48 +616,14 @@
 							if(init && self.pageMods && !self.pageMods.contains(key)) return;
 							var curView = iCat.View[key] || new item.view(key, setItem),
 								cfg = setItem.config;
-							if(!vmGroups[key]){
-								if(init){//(伪)初始化时
-									if(curView.model){
-										delete curView.model;
-									} else {
-										if(!item.model){
-											item.model = iCat.Model['__page_emptyModel'] || new Model('__page_emptyModel');
-										}
-									}
-									vmGroups[key] = item.model.modelId;
-								}
-								else if(item.model){
-									curView.setModel(item.model);
-									vmGroups[key] = item.model.modelId;
-								}
-							}
-
-							if(cfg.scrollWrap || self.config.scrollWrap)
-								self.routes.scrollWrap = self.config.scrollWrap || cfg.scrollWrap;
+							tools.addItem(vmGroups, curView, item.model, init);
 							tools.regEvents(curView, cfg);
 						}
 					);
 				} else {
 					var curView = item.view,
-						key = curView.viewId,
 						cfg = iCat.Model.ViewData(curView.viewId).config;
-					if(!vmGroups[key]){
-						if(init){//(伪)初始化时
-							if(curView.model){
-								delete curView.model;
-							} else {
-								if(!item.model){
-									item.model = iCat.Model['__page_emptyModel'] || new Model('__page_emptyModel');
-								}
-							}
-							vmGroups[key] = item.model.modelId;
-						}
-						else if(item.model){
-							curView.setModel(item.model);
-							vmGroups[key] = item.model.modelId;
-						}
-					}
+					tools.addItem(vmGroups, curView, item.model, init);
 					tools.regEvents(curView, cfg);
 				}
 			});
@@ -618,34 +631,20 @@
 
 		vmRemove: function(vid){
 			if(!vid) return;
-
-			var self = this;
-			if(iCat.isString(vid) && vid.indexOf(',')<0){
-				var vmGroups = self.vmGroups;
-				if(vmGroups[vid]){
-					var events = iCat.Model.ViewData(vid).config.events;
-					if(events){
-						iCat.util.recurse(events, function(e){
-							if(iCat.Event)
-								iCat.Event.undelegate(e);
-							else if(iCat.$ && iCat.$.event){
-								e.type = e.type.replace(/!/g, '')
-											   .replace(/(long|single)?tap/gi, 'click');
-								iCat.$(iCat.elCurWrap).undelegate(e.selector, e.type);
-							}
-						});
-					}
-					delete vmGroups[vid];
-				}
-			} else {
-				var fn = arguments.callee;
-				vid = iCat.isString(vid)? vid.split(',') : vid;
-				iCat.isArray(vid)?// fixed bug:当调用fn时，其中的this指向window
-					vid.forEach(function(k){fn.call(self, k);}) :iCat.foreach(vid, function(k){fn.call(self, k);});
-			}
+			var vmGroups = this.vmGroups;
+			vid = iCat.isString(vid)? vid.split(',') : vid;
+			vid.forEach(function(k){
+				tools.removeItem(vmGroups, k);
+			});
 		},
 
-		vmClear: function(){ this.vmRemove(this.vmGroups); },
+		vmClear: function(){
+			var vmGroups = this.vmGroups;
+			iCat.foreach(vmGroups, function(k){
+				tools.removeItem(vmGroups, k);
+			});
+		},
+
 		gotopage: function(url){ location.href = iCat.util.fullUrl(url); }
 	};
 
@@ -667,9 +666,10 @@
 		},
 
 		dataChange: function(vid, d){
-			var prevData = iCat.Model.ViewData(vid).prevData,
+			var IMData = iCat.Model.ViewData(vid),
+				prevData = IMData.prevData,
 				ret = !iCat.util._jsonCompare(d, prevData);
-			prevData = JSON.stringify(d);
+			if(ret) IMData.prevData = JSON.stringify(d);
 			return ret;
 		},
 

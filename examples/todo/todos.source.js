@@ -6,6 +6,7 @@
 				wrap: '#todo-list',
 				isSave: true,
 				overwrite: false,
+				multiChild: true,
 				events: [
 					{selector:'#new-todo', type:'keypress', callback:'createOnEnter'},
 					{selector:'.edit', type:'keypress', callback:'updateOnEnter'},

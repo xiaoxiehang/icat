@@ -145,7 +145,7 @@
 		},
 
 		ready: function(){
-			var _fn = [],
+			var _fn = [], fun,
 				_do = function(){
 					if(!arguments.callee.done){
 						arguments.callee.done = true;
@@ -156,9 +156,9 @@
 				};
 
 			if(doc.readyState){
-				(function(){
+				(fun = function(){
 					doc.readyState!=='loading'?
-						_do() : setTimeout(arguments.callee, 10);
+						_do() : setTimeout(fun, 10);
 				})();
 			}
 

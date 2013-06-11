@@ -417,6 +417,7 @@
 		scroll: Sutil.scroll || function(box, callback){
 			var me = iCat.isString(box)? iCat.util.queryOne(box, iCat.elCurWrap) : box,
 				o, nodes, isBody;
+			if(!me) return;
 
 			me = me.nodeType!==1? doc.body : me;
 			nodes = me.children;
@@ -433,8 +434,8 @@
 				var boxHeight = iCat.util.outerHeight(isBody? root : me),
 					boxScrollTop = me!==doc.body? me.scrollTop :
 						doc.body.scrollTop || (doc.documentElement && doc.documentElement.scrollTop),
-					pannelHeight = iCat.util.outerHeight(o);
-				callback(boxHeight, boxScrollTop, pannelHeight);
+					panelHeight = iCat.util.outerHeight(o);
+				callback(boxHeight, boxScrollTop, panelHeight);
 			}, false);
 		}
 	});
@@ -623,7 +624,7 @@
 							});
 						}
 						else if(iCat.isString(items)){
-							oSelf._makeHtml(items, pNode, clear);
+							oSelf._makeHtml(items, iCat.util.queryOne(pNode), clear);
 						}
 					},
 
@@ -788,14 +789,13 @@
 				return {
 					/*
 					 * cfg = {
-					 *     scrollWrap/wrap: 父层，没有设置则返回html
+					 *     wrap: 父层，没有设置则返回html
 					 *     tempId: 模板ID（规则同_fnTmpl）
 					 *     hooks: js-hooks，也可以设置伪属性
+					 *     multiChild: 父层可非空渲染
+					 *     callback: 渲染完成后执行回调函数
 					 *     delayTime: 惰性加载img，推迟时间点
 					 *     blankPic: 占位图片选择器
-					 *     callback: 渲染完成后执行回调函数
-					 *     onlyChild: 当单页面模式且此值为true时，会先清空再渲染(同clear效果)
-					 *     overwrite: 父层有子元素时是否覆盖
 					 *     loadCallback: (内部使用)当页面模块化加载时，此为控制函数
 					 * }
 					 *
@@ -804,13 +804,8 @@
 					 */
 					render: function(cfg, data, before, clear){
 						if(cfg && data){
-							var w = cfg.scrollWrap || cfg.wrap,
-								pWrap = iCat.util.queryOne(w, iCat.elCurWrap);
+							var pWrap = iCat.util.queryOne(cfg.wrap, iCat.elCurWrap);
 							iCat.isjQueryObject(pWrap) && (pWrap = pWrap[0]);
-
-							//兼容old-api
-							cfg.overwrite = cfg.repeatOverwrite!==undefined? cfg.repeatOverwrite : cfg.overwrite;
-							cfg.onlyChild = cfg.oneChild!==undefined? cfg.oneChild : cfg.onlyChild;
 
 							var	o = doc.createElement('wrap'),
 								uncla = (cfg.viewId || cfg.tempId) + '-loaded',
@@ -851,8 +846,7 @@
 						if(!pWrap) return html;
 						
 						//辞旧
-						if(cfg.onlyChild===undefined) cfg.onlyChild = true;
-						if(clear || (iCat.singleMode && cfg.onlyChild)){
+						if(clear || !cfg.multiChild){
 							iCat.util.clearHtml(pWrap);
 						}
 
@@ -867,11 +861,9 @@
 							} else {
 								pWrap.insertBefore(o, oldNodes[0]);
 								for(var i=oldNodes.length-1; i>=0; i--){
-									if(cfg.overwrite || !before){
+									if(!before){
 										pWrap.removeChild(oldNodes[i]);
-										if(!cfg.overwrite){
-											o.insertBefore(oldNodes[i], o.firstChild);
-										}
+										o.insertBefore(oldNodes[i], o.firstChild);
 									}
 								}
 							}
@@ -916,17 +908,17 @@
 					 *      dataKey: 可选，与viewId一起组成keyStorage，没有则只有viewId成为keyStorage
 					 *      ajaxUrl: ajax请求地址
 					 *      globalKey: 单页面时，全局数据的key
-					 *      overwrite: 是否覆盖
+					 *      overwrite: 数据重复时是否覆盖，不覆盖则转为repeatData
 					 * }
 					 */
 					fetch: function(cfg, callback){
 						if(!cfg) return;
 
 						var keyStorage,
-							IMData = cfg.viewId? iCat.Model.__pageData[cfg.viewId] : {},
+							IMData = cfg.viewId? iCat.Model.ViewData(cfg.viewId) : {},
 							ownData = IMData.ownData,
 							online = navigator.onLine==true,
-							hasGData = !!cfg.globalKey && iCat.Model.GlobalData(cfg.globalKey);
+							hasGData = !!cfg.globalKey && !!iCat.Model.GlobalData(cfg.globalKey);
 
 						//兼容old-api
 						cfg.dataSave = cfg.isSave!==undefined? cfg.isSave : cfg.dataSave;
@@ -942,7 +934,7 @@
 							oSelf._ajaxFetch(cfg, callback, ownData, keyStorage);
 						}
 						else {
-							!!cfg.globalKey?
+							hasGData?
 								oSelf._globalFetch(cfg, callback, ownData) :
 								oSelf._storageFetch(cfg, callback, ownData, keyStorage);
 						}
@@ -1191,6 +1183,15 @@
 						data = { repeatData: arr };
 					} else {
 						data = JSON.parse(data);
+					}
+				}
+
+				if(cfg.globalKey){
+					if(iCat.isEmptyObject(data)){
+						this._globalFetch(cfg, callback, ownData);
+						return;
+					} else {
+						iCat.Model.GlobalData(cfg.globalKey, data);
 					}
 				}
 

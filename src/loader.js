@@ -248,7 +248,11 @@
 				}
 
 				pNode.appendChild(node);
-				setTimeout(function(){pNode.removeChild(node);},10);
+				if(type==='js'){
+					setTimeout(function(){
+						pNode.removeChild(node);
+					},10);
+				}
 			});
 		},
 
@@ -370,7 +374,7 @@
 		require: function(){//加载有依赖的模块
 			if(!arguments.length) return;
 			arguments.length==1?
-				loader.fnOption(arguments[0]) :
+				loader.fnOption(arguments[0], true) :
 				loader.fnRequire(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]);
 		},
 		
