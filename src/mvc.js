@@ -379,8 +379,11 @@
 			
 			if(self.model.dataChange(vid, data)//数据发生变化
 				|| iCat.hashChange//hash变化(fixed bug: 同init函数不同hash无法渲染)
-					|| iCat.mode_singleLayer)//单层切换
+					|| self.forcedChage//当调用update、改变wrap或tempId时，数据变化与否都要渲染
+						|| iCat.mode_singleLayer)//单层切换
+					
 			{
+				if(self.forcedChage) delete self.forcedChage;
 				if(outData){//设置setData得到的数据
 					ret1 = self.model.save(curCfg, data);
 					if(!!ret1 && iCat.isArray(ret1))
@@ -435,8 +438,10 @@
 		},
 
 		setConfig: function(cfg, before, clear){
-			var self = this;
-			if(self.model.cfgChange(self.viewId, cfg)){
+			var self = this,
+				ret = self.model.cfgChange(self.viewId, cfg);
+			if(ret[0]){
+				if(ret[1]) self.forcedChage = true;
 				self._htmlRender(null, before, clear);
 			}
 		},
@@ -445,7 +450,7 @@
 		setTempId: function(tid, before, clear){ this.setConfig({tempId:tid}, before, clear); },
 		setWrap: function(wrap, before, clear){ this.setConfig({wrap:wrap}, before, clear); },
 		setData: function(data, before, clear){ this._htmlRender(data, before, clear); },
-		update: function(before){ this._htmlRender(null, before, true); }
+		update: function(before){ this._htmlRender(null, before, true); this.forcedChage = true; }
 	};
 
 	/*
@@ -658,11 +663,11 @@
 	iCat.mix(iCat.Model, {
 		cfgChange: function(vid, d){
 			var oldCfg = iCat.Model.ViewData(vid).config,
-				ret = (d.ajaxUrl && oldCfg.ajaxUrl!=d.ajaxUrl) ||
-					  (d.tempId && oldCfg.tempId!=d.tempId) ||
-					  (d.wrap && oldCfg.wrap!=d.wrap);
-			iCat.mix(oldCfg, d);
-			return ret;
+				retAjax = d.ajaxUrl && oldCfg.ajaxUrl!=d.ajaxUrl,
+				retForce = (d.tempId && oldCfg.tempId!=d.tempId) || (d.wrap && oldCfg.wrap!=d.wrap),
+				ret = retAjax || retForce;
+			if(ret) iCat.mix(oldCfg, d);
+			return [ret, retForce];
 		},
 
 		dataChange: function(vid, d){
