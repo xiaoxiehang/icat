@@ -808,7 +808,7 @@
 							iCat.isjQueryObject(pWrap) && (pWrap = pWrap[0]);
 
 							var	o = doc.createElement('wrap'),
-								uncla = (cfg.viewId || cfg.tempId) + '-loaded',
+								uncla = (cfg.viewId || (iCat.isString(cfg.tempId)? cfg.tempId:'wrap')) + '-loaded',
 								oldNodes = iCat.util.queryAll('*[data-unclass='+uncla+']', pWrap),
 								isFirst = !oldNodes.length,
 								curNode, html = '';

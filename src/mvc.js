@@ -562,15 +562,15 @@
 				cfg = self.config,
 				bedSele = o.baseBed || cfg.baseBed;
 
+			if(o.adjustLayout){
+				iCat.util.makeHtml(o.adjustLayout, iCat.elCurWrap || bedSele, iCat.mode_singleLayer);
+				delete o.adjustLayout;
+			}
+
 			if(iCat.mode_multiPage){
 				iCat.elCurWrap = iCat.util.queryOne(bedSele);
 				tools.multiPage(self, o);
 			} else {
-				if(o.adjustLayout){
-					iCat.util.makeHtml(o.adjustLayout, iCat.elCurWrap || bedSele, iCat.mode_singleLayer);
-					delete o.adjustLayout;
-				}
-
 				if(iCat.mode_singleLayer){
 					tools.singleLayer(self, o);
 				} else {
